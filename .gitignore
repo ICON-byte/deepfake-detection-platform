@@ -1,0 +1,32 @@
+# Environment files (both backend and frontend)
+.env
+.env.*
+!.env.example
+
+# Backend (Python)
+backend/venv/
+backend/__pycache__/
+backend/*.pyc
+backend/.pytest_cache/
+backend/uploads/
+
+# Frontend (Node.js)
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+frontend/.cache/
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+
+# Uploaded files
+uploads/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
