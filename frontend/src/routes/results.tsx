@@ -5,12 +5,11 @@ import {
   AlertTriangle, CheckCircle2, Download, RefreshCw, Save, Brain, Eye, Fingerprint, Activity
 } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from "recharts";
-import { requireAuth } from '@/utils/routeGuard';
 
 type Search = { verdict?: "fake" | "real"; confidence?: number; name?: string; type?: string };
 
 export const Route = createFileRoute("/results")({
-  beforeLoad: ({ location }) => requireAuth(location),
+  // Remove this line: beforeLoad: ({ location }) => requireAuth(location),
   validateSearch: (s: Record<string, unknown>): Search => ({
     verdict: s.verdict === "fake" ? "fake" : "real",
     confidence: Number(s.confidence ?? 87),

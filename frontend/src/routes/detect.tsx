@@ -35,7 +35,7 @@ function iconFor(type: string) {
 }
 
 function DetectPage() {
-  const { token, user, scansRemaining } = useAuth();
+  const { token, user, scansRemaining, guestScanCount, decrementScans } = useAuth();
   const navigate = useNavigate();
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -49,9 +49,11 @@ function DetectPage() {
   const uploadIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const statusIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const fetchResultRef = useRef<{ data: any; error: any } | null>(null);
   const startTimeRef = useRef<number | null>(null);
-  const minDuration = 10000; // 10 seconds minimum analysis display
+  const isProcessingRef = useRef<boolean>(false);
+  const minDuration = 10000;
+
+  const GUEST_SCAN_LIMIT = 5;
 
   const getClientId = () => {
     let id = localStorage.getItem('detect_client_id');
@@ -99,13 +101,11 @@ function DetectPage() {
   }, []);
 
   const finishAnalysis = (reportData: any, fileName: string, fileType: string) => {
-    // Clear all animation intervals
     if (statusIntervalRef.current) clearInterval(statusIntervalRef.current);
     if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
     setAnalysisProgress(100);
     setCurrentStatusIndex(STATUSES.length - 1);
 
-    // Navigate after a short delay to show 100%
     setTimeout(() => {
       navigate({
         to: '/results',
@@ -121,13 +121,25 @@ function DetectPage() {
 
   const handleAnalyze = async () => {
     if (!file) return;
+    if (isProcessingRef.current) return;
+
+    const canScan = decrementScans();
+    if (!canScan) {
+      if (!user) {
+        setError(`You have used all ${GUEST_SCAN_LIMIT} free scans. Please log in to continue.`);
+      } else {
+        setError("You have no scans left. Please upgrade your plan.");
+      }
+      return;
+    }
+
+    isProcessingRef.current = true;
     setError(null);
     setUploading(true);
     setAnalyzing(true);
     setCurrentStatusIndex(0);
     setAnalysisProgress(0);
     startTimeRef.current = Date.now();
-    fetchResultRef.current = null;
 
     const formData = new FormData();
     formData.append('file', file);
@@ -135,35 +147,33 @@ function DetectPage() {
       formData.append('client_id', getClientId());
     }
 
-    // Start status rotation: each status 2 seconds => total 10 seconds
+    // Start status rotation (2s per step)
     let step = 0;
     const totalSteps = STATUSES.length;
     if (statusIntervalRef.current) clearInterval(statusIntervalRef.current);
     statusIntervalRef.current = setInterval(() => {
       step++;
-      if (step < totalSteps) {
-        setCurrentStatusIndex(step);
-      }
-      if (step >= totalSteps - 1) {
-        if (statusIntervalRef.current) clearInterval(statusIntervalRef.current);
+      if (step < totalSteps) setCurrentStatusIndex(step);
+      if (step >= totalSteps - 1 && statusIntervalRef.current) {
+        clearInterval(statusIntervalRef.current);
       }
     }, 2000);
 
-    // Progress bar: increase from 0 to 100 over 10 seconds (linear)
+    // Progress bar animation
     let progress = 0;
     if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
     progressIntervalRef.current = setInterval(() => {
       if (progress < 100) {
-        progress = Math.min(progress + (100 / (minDuration / 100)), 100); // increment every 100ms
+        progress = Math.min(progress + (100 / (minDuration / 100)), 100);
         setAnalysisProgress(Math.floor(progress));
       }
     }, 100);
 
-    // Perform the actual API call
     let responseData: any = null;
     let responseError: any = null;
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/detect`, {
+      const apiUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/detect`;
+      const res = await fetch(apiUrl, {
         method: 'POST',
         headers: token ? { Authorization: `Bearer ${token}` } : {},
         body: formData,
@@ -173,7 +183,6 @@ function DetectPage() {
         throw new Error(data.detail || 'Detection failed');
       }
       responseData = data;
-      // Store client_id if returned
       if (data.client_id && !token) {
         localStorage.setItem('detect_client_id', data.client_id);
       }
@@ -187,22 +196,22 @@ function DetectPage() {
     const remaining = Math.max(0, minDuration - elapsed);
 
     if (responseError) {
-      // If error, stop animations and show error after remaining time or immediately
       setTimeout(() => {
         if (statusIntervalRef.current) clearInterval(statusIntervalRef.current);
         if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
         setError(responseError.message || 'Something went wrong');
         setAnalyzing(false);
+        isProcessingRef.current = false;
       }, remaining);
     } else if (responseData) {
-      // Wait for minimum duration before finishing
       setTimeout(() => {
         finishAnalysis(responseData, file.name, file.type);
+        isProcessingRef.current = false;
       }, remaining);
     }
   };
 
-  const isAnalyzeDisabled = uploadProgress < 100 || uploading;
+  const isAnalyzeDisabled = uploadProgress < 100 || uploading || isProcessingRef.current;
 
   return (
     <PageShell>
@@ -216,11 +225,23 @@ function DetectPage() {
             Analyze your <span className="gradient-text">media</span>
           </h1>
           <p className="mt-3 text-gray-400">Drop an image, video, or audio file to begin.</p>
+
+          {/* Guest message with remaining scans count */}
           {!user && (
-            <p className="mt-2 text-xs text-[#F7941D]">
-              Guest: Free scans available. <Link to="/login" className="underline">Login</Link> for higher limits.
-            </p>
+            <div className="mt-2 text-xs">
+              {scansRemaining > 0 ? (
+                <p className="text-[#F7941D]">
+                  Guest: {scansRemaining} free scan{scansRemaining !== 1 ? 's' : ''} remaining.{" "}
+                  <Link to="/login" className="underline">Login</Link> for higher limits.
+                </p>
+              ) : (
+                <p className="text-red-400">
+                  You have used all {GUEST_SCAN_LIMIT} free scans. Please log in to continue.
+                </p>
+              )}
+            </div>
           )}
+
           {user && scansRemaining !== undefined && scansRemaining === 0 && (
             <p className="mt-2 text-xs text-red-400">
               You have used all your scans. <Link to="/pricing" className="underline">Upgrade</Link> to continue.
@@ -303,8 +324,10 @@ function DetectPage() {
                 {error && (
                   <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">
                     {error}
-                    {error.includes('log in') && (
-                      <Link to="/login" className="underline ml-2 text-[#6699FF]">Login</Link>
+                    {!user && error.includes("free scans") && (
+                      <div className="mt-2">
+                        <Link to="/login" className="text-[#6699FF] underline">Go to login</Link>
+                      </div>
                     )}
                   </div>
                 )}
