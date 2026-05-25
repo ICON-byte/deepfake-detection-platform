@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { UploadCloud, Image as ImageIcon, Video, Music, X, Loader2 } from "lucide-react";
 import { PageShell } from "@/components/PageShell";
 import { useAuth } from '@/contexts/AuthContext';
+import { handleFullScanFlow } from "@/api/detectionService";
 
 export const Route = createFileRoute("/detect")({
   component: DetectPage
@@ -21,11 +22,11 @@ const ACCEPT = {
 };
 
 const STATUSES = [
-  "Uploading media",
-  "Scanning metadata",
-  "Detecting inconsistencies",
-  "Running AI analysis",
-  "Generating report",
+  "Securing upload clearance...",
+  "Streaming media payload to S3 cloud storage...",
+  "Invoking Deepfake analytics cluster...",
+  "Evaluating neural network classification tensors...",
+  "Finalizing evaluation data reports...",
 ];
 
 function iconFor(type: string) {
@@ -35,7 +36,7 @@ function iconFor(type: string) {
 }
 
 function DetectPage() {
-  const { token, user, scansRemaining, guestScanCount, decrementScans } = useAuth();
+  const { token, user, scansRemaining, decrementScans } = useAuth();
   const navigate = useNavigate();
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -46,46 +47,24 @@ function DetectPage() {
   const [analysisProgress, setAnalysisProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
-  const uploadIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const statusIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const startTimeRef = useRef<number | null>(null);
   const isProcessingRef = useRef<boolean>(false);
-  const minDuration = 10000;
+  const minDuration = 12000; // Expected timing threshold window for the cloud pipeline run
 
   const GUEST_SCAN_LIMIT = 5;
-
-  const getClientId = () => {
-    let id = localStorage.getItem('detect_client_id');
-    if (!id) {
-      id = crypto.randomUUID();
-      localStorage.setItem('detect_client_id', id);
-    }
-    return id;
-  };
 
   const onDrop = useCallback((accepted: File[]) => {
     const f = accepted[0];
     if (!f) return;
     setFile(f);
     setError(null);
-    setUploadProgress(0);
+    setUploadProgress(0); // Clear progress when a new file lands
     if (f.type.startsWith("image") || f.type.startsWith("video")) {
       setPreview(URL.createObjectURL(f));
     } else {
       setPreview(null);
     }
-
-    if (uploadIntervalRef.current) clearInterval(uploadIntervalRef.current);
-    let p = 0;
-    uploadIntervalRef.current = setInterval(() => {
-      p += Math.random() * 3 + 1;
-      if (p >= 100) {
-        p = 100;
-        if (uploadIntervalRef.current) clearInterval(uploadIntervalRef.current);
-      }
-      setUploadProgress(Math.min(Math.round(p), 100));
-    }, 150);
   }, []);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -94,35 +73,16 @@ function DetectPage() {
 
   useEffect(() => {
     return () => {
-      if (uploadIntervalRef.current) clearInterval(uploadIntervalRef.current);
       if (statusIntervalRef.current) clearInterval(statusIntervalRef.current);
       if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
     };
   }, []);
 
-  const finishAnalysis = (reportData: any, fileName: string, fileType: string) => {
-    if (statusIntervalRef.current) clearInterval(statusIntervalRef.current);
-    if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
-    setAnalysisProgress(100);
-    setCurrentStatusIndex(STATUSES.length - 1);
-
-    setTimeout(() => {
-      navigate({
-        to: '/results',
-        search: {
-          verdict: reportData.report.verdict === 'Fake' ? 'fake' : 'real',
-          confidence: Math.round(reportData.report.confidence),
-          name: fileName,
-          type: fileType.split('/')[0] || 'file',
-        },
-      });
-    }, 300);
-  };
-
   const handleAnalyze = async () => {
     if (!file) return;
     if (isProcessingRef.current) return;
 
+    // Check plan limits before starting the network processing pipeline
     const canScan = decrementScans();
     if (!canScan) {
       if (!user) {
@@ -139,79 +99,72 @@ function DetectPage() {
     setAnalyzing(true);
     setCurrentStatusIndex(0);
     setAnalysisProgress(0);
-    startTimeRef.current = Date.now();
 
-    const formData = new FormData();
-    formData.append('file', file);
-    if (!token) {
-      formData.append('client_id', getClientId());
-    }
+    const startTime = Date.now();
 
-    // Start status rotation (2s per step)
+    // 1. Kick off simulated visual timeline state shifts 
     let step = 0;
-    const totalSteps = STATUSES.length;
     if (statusIntervalRef.current) clearInterval(statusIntervalRef.current);
     statusIntervalRef.current = setInterval(() => {
       step++;
-      if (step < totalSteps) setCurrentStatusIndex(step);
-      if (step >= totalSteps - 1 && statusIntervalRef.current) {
+      if (step < STATUSES.length) setCurrentStatusIndex(step);
+      if (step >= STATUSES.length - 1 && statusIntervalRef.current) {
         clearInterval(statusIntervalRef.current);
       }
-    }, 2000);
+    }, 2500);
 
-    // Progress bar animation
+    // 2. Animate progress meter elements smoothly to 95%
     let progress = 0;
     if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
     progressIntervalRef.current = setInterval(() => {
-      if (progress < 100) {
-        progress = Math.min(progress + (100 / (minDuration / 100)), 100);
-        setAnalysisProgress(Math.floor(progress));
+      if (progress < 95) {
+        progress += Math.random() * 1.5;
+        setAnalysisProgress(Math.min(Math.floor(progress), 95));
       }
-    }, 100);
+    }, 150);
 
-    let responseData: any = null;
-    let responseError: any = null;
     try {
-      const apiUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/detect`;
-      const res = await fetch(apiUrl, {
-        method: 'POST',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        body: formData,
+      // 3. Fire your optimized 3-Step S3 Cloud Pipeline hook
+      const backendReport = await handleFullScanFlow(file, (computedProgress: number) => {
+        // Exposes network progress hook straight to the UI state tracking
+        setUploadProgress(computedProgress);
+        if (computedProgress === 100) {
+          setUploading(false);
+        }
       });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.detail || 'Detection failed');
-      }
-      responseData = data;
-      if (data.client_id && !token) {
-        localStorage.setItem('detect_client_id', data.client_id);
-      }
-    } catch (err: any) {
-      responseError = err;
-    } finally {
-      setUploading(false);
-    }
 
-    const elapsed = Date.now() - (startTimeRef.current || 0);
-    const remaining = Math.max(0, minDuration - elapsed);
+      // 4. Force synchronization delay blocks if backend processes run instantly
+      const elapsed = Date.now() - startTime;
+      const remainingDelay = Math.max(0, minDuration - elapsed);
 
-    if (responseError) {
       setTimeout(() => {
         if (statusIntervalRef.current) clearInterval(statusIntervalRef.current);
         if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
-        setError(responseError.message || 'Something went wrong');
-        setAnalyzing(false);
-        isProcessingRef.current = false;
-      }, remaining);
-    } else if (responseData) {
-      setTimeout(() => {
-        finishAnalysis(responseData, file.name, file.type);
-        isProcessingRef.current = false;
-      }, remaining);
+        
+        setAnalysisProgress(100);
+        setCurrentStatusIndex(STATUSES.length - 1);
+
+        // 5. Navigate to the results screen using the new MongoDB scan record ID
+        setTimeout(() => {
+          navigate({
+            to: '/results',
+            search: { scanId: backendReport._id } as any,
+          });
+          isProcessingRef.current = false;
+        }, 500);
+      }, remainingDelay);
+
+    } catch (err: any) {
+      console.error("🔴 AI Network Analysis Route Crash:", err);
+      if (statusIntervalRef.current) clearInterval(statusIntervalRef.current);
+      if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+      
+      setError(err.response?.data?.message || err.message || 'Detection flow execution halted.');
+      setAnalyzing(false);
+      setUploading(false);
+      isProcessingRef.current = false;
     }
   };
-
-  const isAnalyzeDisabled = uploadProgress < 100 || uploading || isProcessingRef.current;
 
   return (
     <PageShell>
@@ -219,14 +172,13 @@ function DetectPage() {
         <div className="text-center mb-10">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-black/50 backdrop-blur-sm border border-[#6699FF]/30 text-xs font-medium text-gray-300 mb-4">
             <span className="w-1.5 h-1.5 rounded-full bg-[#F7941D]" />
-            <span>AI Detection Engine · Neo Cloud</span>
+            <span>AI Detection Engine · Cloud Architecture</span>
           </div>
           <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-white">
             Analyze your <span className="gradient-text">media</span>
           </h1>
           <p className="mt-3 text-gray-400">Drop an image, video, or audio file to begin.</p>
 
-          {/* Guest message with remaining scans count */}
           {!user && (
             <div className="mt-2 text-xs">
               {scansRemaining > 0 ? (
@@ -255,7 +207,11 @@ function DetectPage() {
               <div className="glass-card text-center py-12">
                 <div className="max-w-md mx-auto mb-8">
                   <div className="flex justify-between text-sm text-gray-400 mb-2">
-                    <span>Analysis progress</span>
+                    <span>
+                      {uploading 
+                        ? `Cloud streaming data... (${uploadProgress}%)` 
+                        : "AI Engine Processing..."}
+                    </span>
                     <span>{analysisProgress}%</span>
                   </div>
                   <div className="w-full h-3 bg-white/10 rounded-full overflow-hidden">
@@ -273,7 +229,7 @@ function DetectPage() {
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -10 }}
                       transition={{ duration: 0.4 }}
-                      className="text-gray-300 text-base font-medium"
+                      className="text-gray-300 text-base font-medium px-4"
                     >
                       {STATUSES[currentStatusIndex]}
                     </motion.div>
@@ -359,24 +315,11 @@ function DetectPage() {
                           setPreview(null);
                           setUploadProgress(0);
                           setError(null);
-                          if (uploadIntervalRef.current) clearInterval(uploadIntervalRef.current);
                         }}
                         className="p-2 rounded-lg bg-black/50 backdrop-blur-sm border border-white/10 hover:bg-white/10 transition"
                       >
                         <X className="w-4 h-4 text-gray-300" />
                       </button>
-                    </div>
-                    <div className="mt-4">
-                      <div className="flex justify-between text-xs text-gray-400 mb-1.5">
-                        <span>{uploadProgress < 100 ? "Uploading..." : "Upload complete"}</span>
-                        <span>{uploadProgress}%</span>
-                      </div>
-                      <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden">
-                        <div
-                          className="h-full gradient-primary transition-all duration-200"
-                          style={{ width: `${uploadProgress}%` }}
-                        />
-                      </div>
                     </div>
                   </div>
                 </div>
@@ -386,7 +329,6 @@ function DetectPage() {
                       setFile(null);
                       setPreview(null);
                       setError(null);
-                      if (uploadIntervalRef.current) clearInterval(uploadIntervalRef.current);
                     }}
                     className="btn-outline"
                   >
@@ -394,10 +336,10 @@ function DetectPage() {
                   </button>
                   <button
                     onClick={handleAnalyze}
-                    disabled={isAnalyzeDisabled}
+                    disabled={uploading || isProcessingRef.current}
                     className="btn-primary"
                   >
-                    {uploading ? <Loader2 className="animate-spin inline mr-2" /> : null}
+                    {isProcessingRef.current ? <Loader2 className="animate-spin inline mr-2 w-4 h-4" /> : null}
                     Analyze Media
                   </button>
                 </div>

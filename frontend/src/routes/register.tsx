@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState, type ChangeEvent } from "react";
 import { PageShell } from "@/components/PageShell";
 import { Mail, Lock, User, ShieldCheck, type LucideIcon } from "lucide-react";
-import { useAuth } from "@/contexts/AuthContext";
+import { api } from "@/api/axiosClient";
 
 export const Route = createFileRoute("/register")({
   component: RegisterPage,
@@ -27,9 +27,8 @@ function Field({ icon: Icon, ...props }: FieldProps) {
 }
 
 function RegisterPage() {
-  const { register, login } = useAuth();
   const navigate = useNavigate();
-  const [username, setUsername] = useState("");
+  const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [agreeTerms, setAgreeTerms] = useState(false);
@@ -51,18 +50,24 @@ function RegisterPage() {
 
     setIsLoading(true);
     try {
-      await register(username, email, password);
-      await login(username, password);
-      navigate({ to: "/pricing" });
-    } catch (err: any) {
-      if (err.message?.includes("login") || err.message?.includes("token")) {
-        navigate({
-          to: "/login",
-          search: { message: "Account created! Please log in to continue." } as any,
-        });
-      } else {
-        setError(err.message || "Registration failed. Please try again.");
+      // Direct post network transaction using your axial base layer configuration
+      const response = await api.post("/auth/register", {
+        fullName,
+        email,
+        password,
+      });
+
+      if (response.data.success) {
+        // Cache the signed JWT access authorization string securely in the browser environment
+        localStorage.setItem("token", response.data.token);
+        
+        // Advance the session securely straight into the monetization funnel
+        navigate({ to: "/pricing" });
       }
+    } catch (err: any) {
+      console.error("🔴 Registration Network Failure:", err);
+      const serverMessage = err.response?.data?.message || "Registration failed. Please try again.";
+      setError(serverMessage);
     } finally {
       setIsLoading(false);
     }
@@ -111,9 +116,9 @@ function RegisterPage() {
             <Field
               icon={User}
               type="text"
-              placeholder="Username"
-              value={username}
-              onChange={(e: ChangeEvent<HTMLInputElement>) => setUsername(e.target.value)}
+              placeholder="Full Name"
+              value={fullName}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => setFullName(e.target.value)}
               required
             />
             <Field

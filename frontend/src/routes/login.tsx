@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate, useSearch } from "@tanstack/react-r
 import { useState, type ChangeEvent, useEffect } from "react";
 import { PageShell } from "@/components/PageShell";
 import { Mail, Lock, ShieldCheck, type LucideIcon } from "lucide-react";
-import { useAuth } from "@/contexts/AuthContext";
+import { api } from "@/api/axiosClient";
 
 type LoginSearch = {
   redirect?: string;
@@ -36,7 +36,6 @@ function Field({ icon: Icon, ...props }: FieldProps) {
 }
 
 function LoginPage() {
-  const { login } = useAuth();
   const navigate = useNavigate();
   const { redirect, message } = useSearch({ from: "/login" });
   const [email, setEmail] = useState("");
@@ -58,11 +57,25 @@ function LoginPage() {
     setError("");
     setSuccessMessage(""); // clear any success message when user submits
     setIsLoading(true);
+    
     try {
-      await login(email, password);
-      navigate({ to: redirect || "/dashboard" });
-    } catch (err) {
-      setError("Invalid email or password. Please try again.");
+      // Connect directly to your Node.js server ports
+      const response = await api.post("/auth/login", {
+        email,
+        password,
+      });
+
+      if (response.data.success) {
+        // Cache your signed JWT credentials string securely inside the browser storage layer
+        localStorage.setItem("token", response.data.token);
+        
+        // Push the user through to their protected target interface destination
+        navigate({ to: redirect || "/dashboard" });
+      }
+    } catch (err: any) {
+      console.error("🔴 Login Network Failure:", err);
+      const serverMessage = err.response?.data?.message || "Invalid email or password. Please try again.";
+      setError(serverMessage);
     } finally {
       setIsLoading(false);
     }
