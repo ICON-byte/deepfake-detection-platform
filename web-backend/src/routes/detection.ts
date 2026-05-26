@@ -25,20 +25,39 @@ const optionalAuth = (req: Request, res: Response, next: any) => {
   next();
 };
 
+// Explicit type parameters for Request Bodies
+interface RequestUploadBody {
+  fileName: string;
+  fileType: string;
+  mode?: 'face' | 'media' | 'audio';
+}
+
+interface AnalyzeRequestBody {
+  fileUrl: string;
+  s3Key: string;
+  fileName: string;
+  detectionMode: 'face' | 'media' | 'audio';
+}
+
 // ==========================================
 // ROUTE 1: POST /api/detection/request-upload
 // DESC:    Generate a secure presigned URL for direct frontend-to-S3 uploads
 // ==========================================
-router.post('/request-upload', optionalAuth, checkRateLimit, async (req: Request, res: Response): Promise<any> => {
+router.post('/request-upload', optionalAuth, checkRateLimit, async (
+  req: Request<{}, {}, RequestUploadBody>, 
+  res: Response
+): Promise<any> => {
   try {
-    const { fileName, fileType } = req.body;
+    const { fileName, fileType, mode } = req.body;
 
     if (!fileName || !fileType) {
       return res.status(400).json({ success: false, message: 'Missing file details (fileName, fileType)' });
     }
 
     // Generate a unique key for the cloud bucket to avoid naming collisions
-    const s3Key = `uploads/${Date.now()}-${fileName}`;
+    // Appending mode profile helps organize asset distributions within S3 buckets neatly
+    const folderPrefix = mode ? `${mode}s` : 'uploads';
+    const s3Key = `${folderPrefix}/${Date.now()}-${fileName}`;
     const bucketName = process.env.AWS_BUCKET_NAME || 'truthlens-bucket';
 
     const command = new PutObjectCommand({
@@ -68,24 +87,33 @@ router.post('/request-upload', optionalAuth, checkRateLimit, async (req: Request
 // ROUTE 2: POST /api/detection/analyze
 // DESC:    Handoff the uploaded file pointer to Python AI and save results
 // ==========================================
-router.post('/analyze', optionalAuth, checkRateLimit, async (req: Request, res: Response): Promise<any> => {
+router.post('/analyze', optionalAuth, checkRateLimit, async (
+  req: Request<{}, {}, AnalyzeRequestBody>, 
+  res: Response
+): Promise<any> => {
   try {
-    const { fileUrl, s3Key, fileName } = req.body;
+    const { fileUrl, s3Key, fileName, detectionMode } = req.body;
 
-    if (!fileUrl || !s3Key || !fileName) {
-      return res.status(400).json({ success: false, message: 'Missing data payload (fileUrl, s3Key, fileName)' });
+    if (!fileUrl || !s3Key || !fileName || !detectionMode) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Missing data payload (fileUrl, s3Key, fileName, detectionMode)' 
+      });
     }
 
     // Define account identities for MongoDB record keeping
     const userId = req.user ? req.user.id : (req.ip || 'unknown-guest');
     const isGuest = !req.user;
 
-    // 1. Send the file URL to the Python FastAPI server for heavy processing
+    // 1. Send the file URL and contextual detection mode parameter to the Python FastAPI server
     const pythonServerUrl = `${process.env.PYTHON_AI_URL || 'http://localhost:8000'}/predict`;
     
-    console.log(`🤖 Node server forwarding to Python AI: ${fileUrl}`);
+    console.log(`🤖 Node server forwarding to Python AI [Mode: ${detectionMode}]: ${fileUrl}`);
     
-    const aiResponse = await axios.post(pythonServerUrl, { fileUrl });
+    const aiResponse = await axios.post(pythonServerUrl, { 
+      fileUrl,
+      detectionMode // Forward mode structure so Python maps to specialized neural networks
+    });
     const aiData = aiResponse.data;
 
     /* We expect the Python team to return this structure:
@@ -96,7 +124,7 @@ router.post('/analyze', optionalAuth, checkRateLimit, async (req: Request, res: 
       }
     */
 
-    // 2. Persist the deepfake intelligence metrics into MongoDB
+    // 2. Persist the deepfake intelligence metrics into MongoDB, including new mode parameters
     const finalizedReport = await ScanHistory.create({
       userId,
       isGuest,
@@ -105,11 +133,12 @@ router.post('/analyze', optionalAuth, checkRateLimit, async (req: Request, res: 
       s3Key,
       confidenceScore: aiData.confidenceScore,
       status: aiData.status,
+      detectionMode, // Saved directly to match updated Schema
       analysisBreakdown: {
-        pixelAnalysis: aiData.breakdown.pixelAnalysis,
-        compression: aiData.breakdown.compression,
-        frequency: aiData.breakdown.frequency,
-        metadata: aiData.breakdown.metadata,
+        pixelAnalysis: aiData.breakdown?.pixelAnalysis ?? 0,
+        compression: aiData.breakdown?.compression ?? 0,
+        frequency: aiData.breakdown?.frequency ?? 0,
+        metadata: aiData.breakdown?.metadata ?? 0,
       }
     });
 
