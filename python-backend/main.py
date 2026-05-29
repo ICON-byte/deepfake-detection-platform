@@ -1,14 +1,10 @@
-import io
 import os
 import requests
-import torch
-import soundfile as sf
-import torchaudio
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
-from transformers import Wav2Vec2Processor, Wav2Vec2ForSequenceClassification
 
+from detectors import DeepfakeAudioDetector, DeepfakeVisionDetector, DeepfakeTextDetector
 
 # ==========================================
 # 1. INITIALIZATION & CROSS-CUTTING CONFIGS
@@ -56,10 +52,7 @@ if os.path.exists(safetensors_path) and os.path.getsize(safetensors_path) < 1000
         pass
 
 try:
-    audio_processor = Wav2Vec2Processor.from_pretrained(AUDIO_MODEL_PATH)
-    audio_model = Wav2Vec2ForSequenceClassification.from_pretrained(
-        AUDIO_MODEL_PATH)
-    audio_model.eval()
+    audio_model = DeepfakeAudioDetector(AUDIO_MODEL_PATH)
     print(" Audio pipeline successfully activated.")
 except Exception as e:
     print(f" Audio engine initialization crash: {str(e)}")
@@ -76,42 +69,9 @@ except Exception as e:
 
 
 # ==========================================
-# 3. UTILITY PREPROCESSORS FOR AUDIO PIPELINE
+# ROUTE 1: POST /predict-audio (Audio Deepfake Entry)
 # ==========================================
-def preprocess_audio_stream(audio_bytes: bytes) -> torch.Tensor:
-    """Directly converts raw cloud byte streams into normalized 16kHz tensors."""
-    data, sr = sf.read(io.BytesIO(audio_bytes))
-    waveform = torch.tensor(data, dtype=torch.float32)
-
-    if len(waveform.shape) == 1:
-        waveform = waveform.unsqueeze(0)
-    else:
-        waveform = waveform.transpose(0, 1)
-        if waveform.shape[0] > 1:
-            waveform = torch.mean(waveform, dim=0, keepdim=True)
-
-    if sr != TARGET_SAMPLE_RATE:
-        resampler = torchaudio.transforms.Resample(
-            orig_freq=sr, new_freq=TARGET_SAMPLE_RATE)
-        waveform = resampler(waveform)
-
-    max_samples = int(MAX_LENGTH_SECONDS * TARGET_SAMPLE_RATE)
-    num_samples = waveform.shape[1]
-
-    if num_samples > max_samples:
-        waveform = waveform[:, :max_samples]
-    elif num_samples < max_samples:
-        padding = torch.zeros(1, max_samples - num_samples)
-        waveform = torch.cat([waveform, padding], dim=1)
-
-    waveform = (waveform - waveform.mean()) / (waveform.std() + 1e-6)
-    return waveform.squeeze(0)
-
-
-# ==========================================
-# ROUTE 1: POST /predict (Audio Deepfake Entry)
-# ==========================================
-@app.post("/predict")
+@app.post("/predict-audio")
 async def predict_audio(payload: DetectionRequest):
     """Core audio analysis pipeline triggered by the Node.js backend."""
     try:
@@ -122,32 +82,15 @@ async def predict_audio(payload: DetectionRequest):
             raise HTTPException(
                 status_code=400, detail="Cloud audio asset streaming connection rejected.")
 
-        processed_waveform = preprocess_audio_stream(response.content)
-
-        inputs = audio_processor(
-            processed_waveform.numpy(),
-            sampling_rate=TARGET_SAMPLE_RATE,
-            return_tensors="pt",
-            padding=True
-        )
-
-        with torch.no_grad():
-            outputs = audio_model(**inputs)
-            logits = outputs.logits
-            probabilities = torch.softmax(logits, dim=-1)
-            predicted_class_id = logits.argmax(dim=-1).item()
-            raw_confidence = probabilities[0, predicted_class_id].item()
-
-        status = "Authentic" if predicted_class_id == 0 else "Manipulated"
-        confidence_score = int(raw_confidence * 100)
+        status, confidence_score = audio_model.predict(response.content)
 
         print(
             f" Audio Prediction Complete: Result={status}, Confidence={confidence_score}%")
 
         # Returns strict telemetry mapping matching Node's MongoDB expectation
         return {
-            "confidenceScore": confidence_score,
             "status": status,
+            "confidenceScore": confidence_score,
             "breakdown": {
                 "pixelAnalysis": 0,  # Zeroed since this is audio
                 "compression": int(confidence_score * 0.92) if confidence_score <= 90 else 94,

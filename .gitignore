@@ -4,12 +4,12 @@
 !.env.example
 
 # Backend (Python)
-backend/venv/
-backend/__pycache__/
-backend/*.pyc
-backend/.pytest_cache/
-backend/uploads/
-/.venv/
+venv/
+.venv/
+__pycache__/
+*.pyc
+pytest_cache/
+uploads/
 
 # Frontend (Node.js)
 frontend/node_modules/
