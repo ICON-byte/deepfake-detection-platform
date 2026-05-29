@@ -1,0 +1,13 @@
+fastapi
+joblib
+opencv-python
+Pillow
+pydantic
+requests
+soundfile
+torch
+torchaudio
+torchvision
+transformers
+ultralytics
+uvicorn

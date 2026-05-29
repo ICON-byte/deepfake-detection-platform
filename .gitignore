@@ -9,6 +9,7 @@ backend/__pycache__/
 backend/*.pyc
 backend/.pytest_cache/
 backend/uploads/
+/.venv/
 
 # Frontend (Node.js)
 frontend/node_modules/
