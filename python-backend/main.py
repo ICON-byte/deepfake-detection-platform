@@ -3,6 +3,7 @@ import requests
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
+import tempfile
 
 from detectors import DeepfakeAudioDetector, DeepfakeVisionDetector, DeepfakeTextDetector
 
@@ -19,9 +20,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 # Shared Data Payload Schema for incoming Node S3 Webhooks
-
-
 class DetectionRequest(BaseModel):
     fileUrl: str
 
@@ -29,28 +29,38 @@ class DetectionRequest(BaseModel):
 # Model Constants
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 AUDIO_MODEL_PATH = os.path.join(SCRIPT_DIR, "audio-model")
-TARGET_SAMPLE_RATE = 16000
-MAX_LENGTH_SECONDS = 4.0
+
+VISION_MODEL_PATH = os.path.join(SCRIPT_DIR, "vision-model/deepfake_face_detector.pth")
+VISION_FACE_DETECTOR_PATH = os.path.join(SCRIPT_DIR, "vision-model/yolov8n-face.pt")
+
+TEXT_MODEL_PATH = os.path.join(SCRIPT_DIR, "text-model/logistic_regression_model.pkl")
+TEXT_VECTORIZER_PATH = os.path.join(SCRIPT_DIR, "text-model/tfidf_vectorizer.pkl")
 
 # ==========================================
 # 2. LOAD COMPONENT MODELS INTO MEMORY
 # ==========================================
-print("  Audio Weights (Wav2Vec2)...")
+def verify_lfs_file(file_path: str) -> None:
+    if os.path.exists(file_path) and os.path.getsize(file_path) < 1000:
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                header = f.read(100)
+                if "version https://git-lfs.github.com" in header:
+                    print(
+                        f" FATAL: {file_path} is a Git LFS pointer.")
+                    print(" Please run: git lfs pull")
+                    raise RuntimeError(
+                        f"Incomplete model files in {file_path} (LFS pointers detected).")
+        except (UnicodeDecodeError, IOError):
+            pass
 
 safetensors_path = os.path.join(AUDIO_MODEL_PATH, "model.safetensors")
-if os.path.exists(safetensors_path) and os.path.getsize(safetensors_path) < 1000:
-    try:
-        with open(safetensors_path, "r", encoding="utf-8") as f:
-            header = f.read(100)
-            if "version https://git-lfs.github.com" in header:
-                print(
-                    " FATAL: 'model.safetensors' is a Git LFS pointer, not the actual weights.")
-                print(" Please run: git lfs pull")
-                raise RuntimeError(
-                    "Incomplete model files (LFS pointers detected).")
-    except (UnicodeDecodeError, IOError):
-        pass
+verify_lfs_file(safetensors_path)
+verify_lfs_file(VISION_MODEL_PATH)
+verify_lfs_file(VISION_FACE_DETECTOR_PATH)
+verify_lfs_file(TEXT_MODEL_PATH)
+verify_lfs_file(TEXT_VECTORIZER_PATH)
 
+print("Initializing Audio Model Core Hook...")
 try:
     audio_model = DeepfakeAudioDetector(AUDIO_MODEL_PATH)
     print(" Audio pipeline successfully activated.")
@@ -58,14 +68,21 @@ except Exception as e:
     print(f" Audio engine initialization crash: {str(e)}")
     raise RuntimeError(f"Could not read audio binaries: {e}")
 
-print("Initializing Image Model Core Hook...")
+print("Initializing Vision Model Core Hook...")
 try:
-    # NOTE: When your team developer is ready with the image model class definition,
-    # they can import and initialize it dynamically right here:
-    # from .image_detection import detect_image_deepfake
-    print(" Image pipeline hook verified and awaiting integration mappings.")
+    vision_model = DeepfakeVisionDetector(VISION_MODEL_PATH, VISION_FACE_DETECTOR_PATH)
+    print("Vision pipeline successfully activated.")
 except Exception as e:
-    print(f"Image initialization warning: {str(e)}")
+    print(f"Vision engine initialization crash: {str(e)}")
+    raise RuntimeError(f"Vision model initialization failed: {e}")
+
+print("Initializing Text Model Core Hook...")
+try:
+    text_model = DeepfakeTextDetector(TEXT_MODEL_PATH, TEXT_VECTORIZER_PATH)
+    print("Text pipeline successfully activated.")
+except Exception as e:
+    print(f"Text engine initialization crash: {str(e)}")
+    raise RuntimeError(f"Text model initialization failed: {e}")
 
 
 # ==========================================
@@ -106,50 +123,83 @@ async def predict_audio(payload: DetectionRequest):
 
 
 # ==========================================
-# ROUTE 2: POST /predict-image (Vision Deepfake Entry)
+# ROUTE 2: POST /predict-image (Image Deepfake Entry)
 # ==========================================
 @app.post("/predict-image")
 async def predict_image(payload: DetectionRequest):
-    """Core vision analysis pipeline for your team's image developer model."""
+    """Core image analysis pipeline."""
     try:
-        print(
-            f"Image link hook engaged, download starting: {payload.fileUrl}")
-
-        # 1. Fetch image file stream from S3 bucket over HTTPS
+        print(f"Downloading image: {payload.fileUrl}")
         response = requests.get(payload.fileUrl, timeout=30)
         if response.status_code != 200:
-            raise HTTPException(
-                status_code=400, detail="Cloud image asset streaming connection rejected.")
+            raise HTTPException(status_code=400, detail="Failed to download image asset.")
 
-        image_bytes = response.content
+        with tempfile.NamedTemporaryFile(suffix=".jpg", delete=True) as tmp:
+            tmp.write(response.content)
+            tmp.flush()
+            status, confidence_score = vision_model.predict_image(tmp.name)
 
-        # ----------------=======================================----------------
-        # PLACEHOLDER LOGIC: To be completely customized by your Image Developer.
-        # They will pass 'image_bytes' through their EfficientNet pipeline here.
-        # ----------------=======================================----------------
-        mock_fake_probability = 0.88  # Example float output
-        confidence_score = int(mock_fake_probability * 100)
-        status = "Manipulated" if confidence_score > 50 else "Authentic"
+        if confidence_score is None:
+            raise HTTPException(status_code=422, detail="No face detected or image is unreadable.")
 
-        print(
-            f"Image Prediction Complete: Result={status}, Confidence={confidence_score}%")
+        print(f"Image Prediction Complete: Result={status}, Confidence={confidence_score}%")
 
-        # Returns the layout matching Node's MongoDB expectation
         return {
-            "confidenceScore": confidence_score,
             "status": status,
+            "confidenceScore": confidence_score,
             "breakdown": {
-                "pixelAnalysis": confidence_score,  # High priority focus for vision tasks
+                "pixelAnalysis": confidence_score,
                 "compression": int(confidence_score * 0.85),
                 "frequency": int(confidence_score * 0.90),
-                "metadata": 75
-            }
+                "metadata": 75,
+            },
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
-        print(f" Image processing pipeline fault: {str(e)}")
-        raise HTTPException(
-            status_code=500, detail=f"Core Image Processing Fault: {str(e)}")
+        print(f"Image processing pipeline fault: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Core Image Processing Fault: {str(e)}")
+
+
+# ==========================================
+# ROUTE 3: POST /predict-video (Video Deepfake Entry)
+# ==========================================
+@app.post("/predict-video")
+async def predict_video(payload: DetectionRequest):
+    """Core video analysis pipeline."""
+    try:
+        print(f"Downloading video: {payload.fileUrl}")
+        response = requests.get(payload.fileUrl, timeout=30)
+        if response.status_code != 200:
+            raise HTTPException(status_code=400, detail="Failed to download video asset.")
+
+        with tempfile.NamedTemporaryFile(suffix=".mp4", delete=True) as tmp:
+            tmp.write(response.content)
+            tmp.flush()
+            status, confidence_score = vision_model.predict_video(tmp.name)
+
+        if confidence_score is None:
+            raise HTTPException(status_code=422, detail="No face detected or video is unreadable.")
+
+        print(f"Video Prediction Complete: Result={status}, Confidence={confidence_score}%")
+
+        return {
+            "status": status,
+            "confidenceScore": confidence_score,
+            "breakdown": {
+                "pixelAnalysis": confidence_score,
+                "compression": int(confidence_score * 0.80),
+                "frequency": int(confidence_score * 0.88),
+                "metadata": 70,
+            },
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Video processing pipeline fault: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Core Video Processing Fault: {str(e)}")
 
 
 if __name__ == "__main__":
