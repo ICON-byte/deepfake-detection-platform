@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 import tempfile
 import warnings
-from detectors import DeepfakeAudioDetector, DeepfakeVisionDetector, DeepfakeTextDetector
+from .detectors import DeepfakeAudioDetector, DeepfakeVisionDetector, DeepfakeTextDetector
 
 warnings.filterwarnings("ignore")
 
