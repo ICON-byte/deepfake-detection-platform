@@ -21,7 +21,7 @@ Activate it:
 ## 2. Install Dependencies
 
 ```bash
-pip install -r requirements.txt
+pip install -r ./python-backend/requirements.txt
 ```
 
 ## 3. Install and enable Git LFS
