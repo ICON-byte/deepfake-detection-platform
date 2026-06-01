@@ -33,10 +33,11 @@ interface RequestUploadBody {
 }
 
 interface AnalyzeRequestBody {
-  fileUrl: string;
-  s3Key: string;
-  fileName: string;
-  detectionMode: 'face' | 'media' | 'audio';
+  fileUrl?: string;
+  url?: string;
+  s3Key?: string;
+  fileName?: string;
+  detectionMode: 'face' | 'media' | 'audio' | 'phishing';
 }
 
 // ==========================================
@@ -92,27 +93,35 @@ router.post('/analyze', optionalAuth, checkRateLimit, async (
   res: Response
 ): Promise<any> => {
   try {
-    const { fileUrl, s3Key, fileName, detectionMode } = req.body;
+    const { fileUrl, url, s3Key, fileName, detectionMode } = req.body;
 
-    if (!fileUrl || !s3Key || !fileName || !detectionMode) {
+    if (detectionMode !== 'phishing' && (!fileUrl || !s3Key || !fileName)) {
       return res.status(400).json({ 
         success: false, 
-        message: 'Missing data payload (fileUrl, s3Key, fileName, detectionMode)' 
+        message: 'Missing data payload (fileUrl, s3Key, fileName)' 
       });
     }
+
+    if (detectionMode === 'phishing' && !url) {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Missing URL for phishing analysis' 
+        });
+      }
 
     // Define account identities for MongoDB record keeping
     const userId = req.user ? req.user.id : (req.ip || 'unknown-guest');
     const isGuest = !req.user;
 
-    // 1. Send the file URL and contextual detection mode parameter to the Python FastAPI server
+    // 1. Send the data to the Python FastAPI server
     const pythonServerUrl = `${process.env.PYTHON_AI_URL || 'http://localhost:8000'}/predict`;
     
-    console.log(`🤖 Node server forwarding to Python AI [Mode: ${detectionMode}]: ${fileUrl}`);
+    console.log(`🤖 Node server forwarding to Python AI [Mode: ${detectionMode}]: ${url || fileUrl}`);
     
     const aiResponse = await axios.post(pythonServerUrl, { 
       fileUrl,
-      detectionMode // Forward mode structure so Python maps to specialized neural networks
+      url,
+      detectionMode
     });
     const aiData = aiResponse.data;
 
@@ -124,20 +133,20 @@ router.post('/analyze', optionalAuth, checkRateLimit, async (
       }
     */
 
-    // 2. Persist the deepfake intelligence metrics into MongoDB, including new mode parameters
+    // 2. Persist the intelligence metrics into MongoDB
     const finalizedReport = await ScanHistory.create({
       userId,
       isGuest,
-      fileName,
-      s3Url: fileUrl,
-      s3Key,
+      fileName: fileName || (detectionMode === 'phishing' ? url : 'unknown'),
+      s3Url: fileUrl || url || '',
+      s3Key: s3Key || 'phishing-url',
       confidenceScore: aiData.confidenceScore,
       status: aiData.status,
-      detectionMode, // Saved directly to match updated Schema
+      detectionMode, 
       analysisBreakdown: {
-        pixelAnalysis: aiData.breakdown?.pixelAnalysis ?? 0,
-        compression: aiData.breakdown?.compression ?? 0,
-        frequency: aiData.breakdown?.frequency ?? 0,
+        pixelAnalysis: aiData.breakdown?.pixelAnalysis || aiData.breakdown?.urlAnalysis || 0,
+        compression: aiData.breakdown?.compression || aiData.breakdown?.domainReputation || 0,
+        frequency: aiData.breakdown?.frequency || aiData.breakdown?.structuralHeuristics || 0,
         metadata: aiData.breakdown?.metadata ?? 0,
       }
     });

@@ -23,8 +23,18 @@ export const handleFullScanFlow = async (file: File, onProgress: (progress: numb
   const analysisResponse = await api.post('/detection/analyze', {
     fileUrl,
     s3Key,
-    fileName: file.name
+    fileName: file.name,
+    detectionMode: file.type.startsWith('audio') ? 'audio' : (file.type.startsWith('video') ? 'media' : 'face')
   });
 
   return analysisResponse.data.data;
-};
+  };
+
+  export const handleUrlScanFlow = async (url: string) => {
+  const analysisResponse = await api.post('/detection/analyze', {
+    url,
+    detectionMode: 'phishing'
+  });
+
+  return analysisResponse.data.data;
+  };

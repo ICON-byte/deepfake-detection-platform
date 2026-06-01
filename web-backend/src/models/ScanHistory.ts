@@ -17,7 +17,7 @@ export interface IScanHistory extends Document {
   s3Key: string; // Crucial reference for the AWS 3-day data lifecycle deletion rule
   confidenceScore: number;
   status: 'Authentic' | 'Manipulated';
-  detectionMode: 'face' | 'media' | 'audio'; // 🟢 Added to support multi-mode tracking pipelines
+  detectionMode: 'face' | 'media' | 'audio' | 'phishing'; // 🟢 Added phishing support
   analysisBreakdown: IAnalysisBreakdown;
   createdAt: Date;
 }
@@ -58,7 +58,7 @@ const ScanHistorySchema: Schema = new Schema(
     },
     detectionMode: {
       type: String,
-      enum: ['face', 'media', 'audio'],
+      enum: ['face', 'media', 'audio', 'phishing'],
       default: 'media',
       required: true
     },

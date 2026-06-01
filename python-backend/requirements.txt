@@ -12,3 +12,7 @@ torchvision
 transformers
 ultralytics
 uvicorn
+pandas
+tldextract
+numpy
+scipy
