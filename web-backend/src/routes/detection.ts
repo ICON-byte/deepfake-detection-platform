@@ -18,26 +18,24 @@ const optionalAuth = (req: Request, res: Response, next: any) => {
       const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret') as TJwtPayload;
       req.user = decoded;
     } catch (error) {
-      // Token failed, but we let them proceed as a guest instead of crashing
       console.warn('⚠️ Optional Auth: Token provided but invalid.');
     }
   }
   next();
 };
 
-// Explicit type parameters for Request Bodies
+// Explicit type definitions for incoming request objects
 interface RequestUploadBody {
   fileName: string;
   fileType: string;
-  mode?: 'face' | 'media' | 'audio';
+  mode?: 'audio' | 'image' | 'video' | 'text';
 }
 
 interface AnalyzeRequestBody {
-  fileUrl?: string;
-  url?: string;
-  s3Key?: string;
-  fileName?: string;
-  detectionMode: 'face' | 'media' | 'audio' | 'phishing';
+  fileUrl: string;
+  s3Key: string;
+  fileName: string;
+  detectionMode: 'audio' | 'image' | 'video' | 'text';
 }
 
 // ==========================================
@@ -55,8 +53,7 @@ router.post('/request-upload', optionalAuth, checkRateLimit, async (
       return res.status(400).json({ success: false, message: 'Missing file details (fileName, fileType)' });
     }
 
-    // Generate a unique key for the cloud bucket to avoid naming collisions
-    // Appending mode profile helps organize asset distributions within S3 buckets neatly
+    // Isolate assets cleanly based on their target detection engine context
     const folderPrefix = mode ? `${mode}s` : 'uploads';
     const s3Key = `${folderPrefix}/${Date.now()}-${fileName}`;
     const bucketName = process.env.AWS_BUCKET_NAME || 'truthlens-bucket';
@@ -67,7 +64,6 @@ router.post('/request-upload', optionalAuth, checkRateLimit, async (
       ContentType: fileType,
     });
 
-    // Create an upload link that expires in 15 minutes (900 seconds)
     const presignedUrl = await getSignedUrl(s3Client, command, { expiresIn: 900 });
     const publicFileUrl = `https://${bucketName}.s3.${process.env.AWS_REGION || 'us-east-1'}.amazonaws.com/${s3Key}`;
 
@@ -86,79 +82,80 @@ router.post('/request-upload', optionalAuth, checkRateLimit, async (
 
 // ==========================================
 // ROUTE 2: POST /api/detection/analyze
-// DESC:    Handoff the uploaded file pointer to Python AI and save results
+// DESC:    Handoff the uploaded file pointer to the specific Python AI engine path and save results
 // ==========================================
 router.post('/analyze', optionalAuth, checkRateLimit, async (
   req: Request<{}, {}, AnalyzeRequestBody>, 
   res: Response
 ): Promise<any> => {
   try {
-    const { fileUrl, url, s3Key, fileName, detectionMode } = req.body;
+    const { fileUrl, s3Key, fileName, detectionMode } = req.body;
 
-    if (detectionMode !== 'phishing' && (!fileUrl || !s3Key || !fileName)) {
+    if (!fileUrl || !s3Key || !fileName || !detectionMode) {
       return res.status(400).json({ 
         success: false, 
-        message: 'Missing data payload (fileUrl, s3Key, fileName)' 
+        message: 'Missing data payload (fileUrl, s3Key, fileName, detectionMode)' 
       });
     }
 
-    if (detectionMode === 'phishing' && !url) {
-        return res.status(400).json({ 
-          success: false, 
-          message: 'Missing URL for phishing analysis' 
-        });
-      }
-
-    // Define account identities for MongoDB record keeping
     const userId = req.user ? req.user.id : (req.ip || 'unknown-guest');
     const isGuest = !req.user;
 
-    // 1. Send the data to the Python FastAPI server
-    const pythonServerUrl = `${process.env.PYTHON_AI_URL || 'http://localhost:8000'}/predict`;
+    // 1. Map incoming mode parameter directly to the correct Python FastAPI target endpoint URL
+    let targetEndpoint = 'predict-image'; // fallback default
+    if (detectionMode === 'audio') targetEndpoint = 'predict-audio';
+    else if (detectionMode === 'video') targetEndpoint = 'predict-video';
+    else if (detectionMode === 'text') targetEndpoint = 'predict-text';
+
+    const pythonServerUrl = `${process.env.PYTHON_AI_URL || 'http://localhost:8000'}/${targetEndpoint}`;
     
-    console.log(`🤖 Node server forwarding to Python AI [Mode: ${detectionMode}]: ${url || fileUrl}`);
+    console.log(`🤖 Routing token to AI Framework -> [${pythonServerUrl}]: ${fileUrl}`);
     
-    const aiResponse = await axios.post(pythonServerUrl, { 
-      fileUrl,
-      url,
-      detectionMode
-    });
+    // 2. Transmit standard payload to target AI engine channel
+    const aiResponse = await axios.post(pythonServerUrl, { fileUrl });
     const aiData = aiResponse.data;
 
-    /* We expect the Python team to return this structure:
-      {
-        "confidenceScore": 88,
-        "status": "Manipulated",
-        "breakdown": { "pixelAnalysis": 90, "compression": 85, "frequency": 92, "metadata": 85 }
-      }
-    */
+    // 3. Normalize state properties: convert Python "Fake" to Mongoose "Manipulated", and anything else to "Authentic"
+    const mappedStatus: 'Authentic' | 'Manipulated' = 
+      (aiData.status && aiData.status.toLowerCase() === 'fake') ? 'Manipulated' : 'Authentic';
 
-    // 2. Persist the intelligence metrics into MongoDB
+    // 4. Record metadata metrics inside database cluster
     const finalizedReport = await ScanHistory.create({
       userId,
       isGuest,
-      fileName: fileName || (detectionMode === 'phishing' ? url : 'unknown'),
-      s3Url: fileUrl || url || '',
-      s3Key: s3Key || 'phishing-url',
-      confidenceScore: aiData.confidenceScore,
-      status: aiData.status,
-      detectionMode, 
+      fileName,
+      s3Url: fileUrl,
+      s3Key,
+      confidenceScore: aiData.confidenceScore ?? 0,
+      status: mappedStatus,
+      detectionMode,
       analysisBreakdown: {
-        pixelAnalysis: aiData.breakdown?.pixelAnalysis || aiData.breakdown?.urlAnalysis || 0,
-        compression: aiData.breakdown?.compression || aiData.breakdown?.domainReputation || 0,
-        frequency: aiData.breakdown?.frequency || aiData.breakdown?.structuralHeuristics || 0,
+        pixelAnalysis: aiData.breakdown?.pixelAnalysis ?? 0,
+        compression: aiData.breakdown?.compression ?? 0,
+        frequency: aiData.breakdown?.frequency ?? 0,
         metadata: aiData.breakdown?.metadata ?? 0,
       }
     });
 
-    // 3. Return the saved record to TanStack query to render immediate graphics
     return res.json({
       success: true,
       data: finalizedReport
     });
 
   } catch (error: any) {
-    console.error('🔴 AI Microservice Error:', error.message);
+    // Gracefully catch and handle specific Axios/FastAPI errors (like 422 "No face detected")
+    if (error.response) {
+      console.error(`🔴 Python AI Endpoint Error [Status ${error.response.status}]:`, error.response.data);
+      
+      if (error.response.status === 422) {
+        return res.status(422).json({
+          success: false,
+          message: 'Analysis failed: The media format is unreadable or no facial subjects were detected.'
+        });
+      }
+    }
+
+    console.error('🔴 General AI Gateway Connection Failure:', error.message);
     return res.status(500).json({ 
       success: false, 
       message: 'The AI deepfake engine failed to parse this asset. Please try again later.' 
