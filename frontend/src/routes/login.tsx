@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { SiteLayout } from "@/components/SiteLayout";
 import { useState } from "react";
+import { Mail, Lock } from "lucide-react";
 
 export const Route = createFileRoute("/login")({
   head: () => ({
@@ -26,23 +27,16 @@ function LoginPage() {
     setIsLoading(true);
     setError("");
 
-    // Simulate API call / authentication
-    // In a real app, replace with actual authentication logic
     try {
-      // Mock validation
       if (!email.trim() || !password.trim()) {
         throw new Error("Please fill in all fields");
       }
       
-      // Simulate network delay
       await new Promise((resolve) => setTimeout(resolve, 800));
       
-      // For demo purposes, accept any non-empty credentials
-      // Store auth state (e.g., localStorage, context)
       localStorage.setItem("truthlens_auth", "true");
       localStorage.setItem("truthlens_user", email);
       
-      // Navigate to detect page
       navigate({ to: "/detect" });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed. Please try again.");
@@ -53,8 +47,13 @@ function LoginPage() {
 
   return (
     <SiteLayout>
-      <section className="mx-auto grid min-h-[calc(100vh-4rem)] max-w-6xl gap-0 px-0 md:grid-cols-2">
-        <div className="flex flex-col justify-center bg-[#f4f6ff] px-6 py-12 sm:px-12">
+      <section className="mx-auto grid min-h-[calc(100vh-4rem)] max-w-6xl gap-0 px-0 pt-30 md:grid-cols-2">
+        <div className="flex flex-col justify-center bg-[#f4f6ff] px-6 py-12 pt-100 sm:px-12">
+          <div className="mb-20">
+            <div className="absolute top-50 left-25">
+              <img src="/public\images/logo.svg" alt="NeoCloud" className="h-10 w-auto" />
+            </div>
+          </div>
           <h1 className="text-3xl font-bold sm:text-4xl">
             Welcome back to
             <br />
@@ -79,32 +78,41 @@ function LoginPage() {
             <form onSubmit={handleSubmit} className="mt-6 space-y-4">
               <div>
                 <label className="text-xs font-medium text-foreground/80">Email</label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Enter your email"
-                  className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-                  required
-                />
+                <div className="relative mt-1">
+                  <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="Enter your email"
+                    className="w-full rounded-md border border-input bg-background py-2 pl-10 pr-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                    required
+                  />
+                </div>
               </div>
+              
               <div>
                 <label className="text-xs font-medium text-foreground/80">Password</label>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter your password"
-                  className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-                  required
-                />
+                <div className="relative mt-1">
+                  <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Enter your password"
+                    className="w-full rounded-md border border-input bg-background py-2 pl-10 pr-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                    required
+                  />
+                </div>
               </div>
+              
               <div className="flex items-center justify-between text-xs">
                 <label className="inline-flex items-center gap-2 text-muted-foreground">
                   <input type="checkbox" className="rounded border-input" /> Remember me
                 </label>
                 <a href="#" className="text-primary hover:underline">Forgot Password?</a>
               </div>
+              
               <button
                 type="submit"
                 disabled={isLoading}
