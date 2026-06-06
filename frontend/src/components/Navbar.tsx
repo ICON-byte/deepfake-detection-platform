@@ -1,33 +1,64 @@
-import { Link, useLocation } from "@tanstack/react-router";
-import { useState } from "react";
-import { Menu, X } from "lucide-react";
+import { Link, useNavigate, useLocation } from "@tanstack/react-router";
+import { useState, useEffect } from "react";
+import { Menu, X, LogOut } from "lucide-react";
 
 export function Navbar() {
   const [open, setOpen] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const navigate = useNavigate();
   const location = useLocation();
-  
+
   // Check if the current route is exactly the landing page
   const isLandingPage = location.pathname === "/";
 
-  const nav = [
+  // Check authentication status on mount and when localStorage changes
+  useEffect(() => {
+    const checkAuth = () => {
+      const auth = localStorage.getItem("truthlens_auth") === "true";
+      setIsLoggedIn(auth);
+    };
+    checkAuth();
+
+    // Listen for storage events (in case logout happens in another tab)
+    window.addEventListener("storage", checkAuth);
+    return () => window.removeEventListener("storage", checkAuth);
+  }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem("truthlens_auth");
+    localStorage.removeItem("truthlens_user");
+    setIsLoggedIn(false);
+    navigate({ to: "/" });
+    setOpen(false);
+  };
+
+  // Navigation links based on authentication
+  const loggedOutNav = [
     { to: "/", label: "Home" },
     { to: "/about", label: "About" },
     { to: "/detect", label: "Detect" },
   ] as const;
 
+  const loggedInNav = [
+    { to: "/detect", label: "Detect" },
+    { to: "/history", label: "History" },
+  ] as const;
+
+  const nav = isLoggedIn ? loggedInNav : loggedOutNav;
+
   return (
     <header
-      className={`fixed left-1/2 top-3 z-50 w-[calc(100%-1rem)] max-w-7xl -translate-x-1/2 rounded-2xl border transition-colors duration-200 sm:top-6 sm:w-[calc(100%-2rem)] ${
+      className={`fixed left-1/2 top-3 z-50 w-[calc(100%-1rem)] max-w-7xl -translate-x-1/2 rounded-2xl border transition-all duration-200 sm:top-6 sm:w-[calc(100%-2rem)] ${
         isLandingPage
-          ? "border-gray-200 bg-white shadow-md" 
+          ? "border-gray-200 bg-white/90 shadow-md backdrop-blur-sm"
           : "border-[#6699ff]/20 bg-[#6699ff]/15 shadow-sm backdrop-blur-md"
       }`}
     >
       {/* Desktop layout: left (logo), center (nav links), right (buttons) */}
       <div className="flex h-14 items-center justify-between px-3 sm:h-16 sm:px-6 lg:px-8">
         {/* Logo - left */}
-        <Link to="/" className="shrink-0 text-xl font-semibold tracking-tight text-foreground">
-          <img src="/images/logo.svg" alt="Logo" className="h-9 w-auto sm:h-auto" />
+        <Link to="/" className="shrink-0 text-xl font-semibold tracking-tight text-foreground flex items-center">
+          <img src="/images/logo.svg" alt="Logo" className="h-9 w-auto sm:h-10" />
         </Link>
 
         {/* Navigation links - centered (hidden on mobile) */}
@@ -47,20 +78,32 @@ export function Navbar() {
           ))}
         </nav>
 
-        {/* Right side buttons - Login & Register */}
+        {/* Right side buttons - conditional based on auth */}
         <div className="hidden items-center gap-2 md:flex">
-          <Link
-            to="/login"
-            className="rounded-full px-4 py-1.5 text-sm font-medium text-foreground/80 transition-colors hover:text-foreground"
-          >
-            Login
-          </Link>
-          <Link
-            to="/register"
-            className="rounded-lg bg-[#6699ff] px-4 py-1.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-[#6699ff]/90"
-          >
-            Register
-          </Link>
+          {!isLoggedIn ? (
+            <>
+              <Link
+                to="/login"
+                className="rounded-full px-4 py-1.5 text-sm font-medium text-foreground/80 transition-colors hover:text-foreground"
+              >
+                Login
+              </Link>
+              <Link
+                to="/register"
+                className="rounded-xl bg-[#6699ff] px-4 py-1.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-[#6699ff]/90"
+              >
+                Register
+              </Link>
+            </>
+          ) : (
+            <button
+              onClick={handleLogout}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border/70 bg-background px-4 py-1.5 text-sm font-medium text-foreground/80 transition-colors hover:bg-secondary"
+            >
+              <LogOut className="h-3.5 w-3.5" />
+              Logout
+            </button>
+          )}
         </div>
 
         {/* Mobile menu button */}
@@ -75,9 +118,11 @@ export function Navbar() {
 
       {/* Mobile dropdown menu */}
       {open && (
-        <div className={`border-t rounded-b-2xl backdrop-blur-md md:hidden ${
-          isLandingPage ? "border-gray-100 bg-white" : "border-[#6699ff]/20 bg-white/90"
-        }`}>
+        <div
+          className={`border-t rounded-b-2xl backdrop-blur-md md:hidden ${
+            isLandingPage ? "border-gray-100 bg-white/95" : "border-[#6699ff]/20 bg-white/90"
+          }`}
+        >
           <div className="flex flex-col gap-1 px-4 py-3">
             {nav.map((n) => (
               <Link
@@ -89,20 +134,33 @@ export function Navbar() {
                 {n.label}
               </Link>
             ))}
-            <Link
-              to="/login"
-              onClick={() => setOpen(false)}
-              className="rounded-md px-3 py-2 text-sm font-medium text-foreground/80 hover:bg-gray-100"
-            >
-              Login
-            </Link>
-            <Link
-              to="/register"
-              onClick={() => setOpen(false)}
-              className="rounded-md bg-[#6699ff] px-3 py-2 text-center text-sm font-medium text-white"
-            >
-              Register
-            </Link>
+
+            {!isLoggedIn ? (
+              <>
+                <Link
+                  to="/login"
+                  onClick={() => setOpen(false)}
+                  className="rounded-md px-3 py-2 text-sm font-medium text-foreground/80 hover:bg-gray-100"
+                >
+                  Login
+                </Link>
+                <Link
+                  to="/register"
+                  onClick={() => setOpen(false)}
+                  className="rounded-md bg-[#6699ff] px-3 py-2 text-center text-sm font-medium text-white"
+                >
+                  Register
+                </Link>
+              </>
+            ) : (
+              <button
+                onClick={handleLogout}
+                className="rounded-md px-3 py-2 text-left text-sm font-medium text-foreground/80 hover:bg-gray-100 flex items-center gap-2"
+              >
+                <LogOut className="h-4 w-4" />
+                Logout
+              </button>
+            )}
           </div>
         </div>
       )}
