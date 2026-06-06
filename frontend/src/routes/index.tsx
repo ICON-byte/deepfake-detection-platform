@@ -5,7 +5,7 @@ import {
   ScanFace,
   Image as ImageIcon,
   AudioLines,
-  Sparkles,
+  MousePointerClick,
   ShieldCheck,
   UploadCloud,
   Cpu,
@@ -50,7 +50,7 @@ const features = [
     desc: "Voice cloning identification, synthetic speech detection, and anomaly screening for high-fidelity audio assets.",
   },
   {
-    icon: Sparkles,
+    icon: MousePointerClick,
     title: "AI - Powered Analysis",
     desc: "Deep learning models trained on cutting-edge synthetic media datasets to deliver highly granular detection scores.",
   },
@@ -180,8 +180,8 @@ function HomePage() {
       {/* Detection Across Every Media Format */}
       <section className="mx-auto mt-8 max-w-[90rem] px-3 py-14 sm:mt-12 sm:px-4 sm:py-16 lg:px-6">
         <div className="mb-10 text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-[#6699ff] text-white shadow-md shadow-[#6699ff]/20">
-            <Sparkles className="size-6" />
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-[#3860AF] text-white shadow-md shadow-[#6699ff]/20">
+            <MousePointerClick className="size-6" />
           </div>
           <h2 className="text-2xl font-bold leading-tight sm:text-3xl">
             Detection Across Every <span className="text-[#6699ff]">Media Format</span>
@@ -224,8 +224,8 @@ function HomePage() {
       <section className="bg-white border-y border-border/40">
         <div className="mx-auto max-w-[90rem] px-3 py-14 sm:px-4 sm:py-20 lg:px-6">
           <div className="mb-12 text-center">
-            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-[#6699ff] text-white shadow-md">
-              <Sparkles className="size-6" />
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-[#3860AF] text-white shadow-md">
+              <MousePointerClick className="size-6" />
             </div>
             <h2 className="text-3xl font-bold text-foreground tracking-tight sm:text-4xl">
               How it <span className="text-white bg-[#6699ff] px-2 py-0.5 rounded-none">Works</span>

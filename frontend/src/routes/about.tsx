@@ -168,18 +168,18 @@ function AboutPage() {
               </p>
             </div>
             <div className="grid grid-cols-2 gap-3 sm:gap-4">
-              <div className="aspect-square w-full overflow-hidden rounded-2xl">
+              <div className="aspect-square w-full overflow-hidden rounded-xl">
                 <img
-                  src="/images/about-4.png"
+                  src="/images/about-4.webp"
                   alt="Commitment illustration left"
-                  className="h-full w-full object-contain"
+                  className="h-full w-full object-cover"
                 />
               </div>
               <div className="aspect-square w-full overflow-hidden rounded-2xl">
                 <img
-                  src="/images/about-5.png"
+                  src="/images/about-5.webp"
                   alt="Commitment illustration right"
-                  className="h-full w-full object-contain"
+                  className="h-full w-full object-cover"
                 />
               </div>
             </div>
