@@ -1,214 +1,273 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { motion } from "framer-motion";
+import { SiteLayout } from "@/components/SiteLayout";
 import {
-  Image, Video, Music, Brain, Lock, Upload, Search, FileCheck,
-  ChevronRight, ChevronDown, Eye,
+  ChevronDown,
+  ScanFace,
+  Image as ImageIcon,
+  AudioLines,
+  Sparkles,
+  ShieldCheck,
+  UploadCloud,
+  Cpu,
+  CheckCircle2,
+  ArrowRight,
+  ArrowRightIcon,
+  ChevronRight,
+  MousePointerClick,
+  MousePointerClickIcon,
 } from "lucide-react";
 import { useState } from "react";
-import { PageShell } from "@/components/PageShell";
-import { GradientButton } from "@/components/GradientButton";
-import { GlassCard } from "@/components/GlassCard";
 
-export const Route = createFileRoute("/")({ component: Index });
+export const Route = createFileRoute("/")({
+  head: () => ({
+    meta: [
+      { title: "TruthLens — AI-Powered Deepfake Detection" },
+      {
+        name: "description",
+        content:
+          "TruthLens AI analyzes images, videos, and audio for signs of manipulation using advanced AI detection technology.",
+      },
+      { property: "og:title", content: "TruthLens — AI-Powered Deepfake Detection" },
+      {
+        property: "og:description",
+        content: "Verify media authenticity in seconds with TruthLens.",
+      },
+    ],
+  }),
+  component: HomePage,
+});
 
 const features = [
-  { icon: Image, title: "Image Deepfake Detection", desc: "Pixel-level analysis catches face swaps, GAN artifacts, and tampered metadata." },
-  { icon: Video, title: "Video Deepfake Detection", desc: "Frame-by-frame neural inspection with temporal consistency scoring." },
-  { icon: Music, title: "Audio Detection", desc: "Spectral fingerprinting identifies cloned voices and synthetic speech." },
-  { icon: Brain, title: "AI-Powered Analysis", desc: "Ensemble of state-of-the-art models trained on millions of samples." },
-  { icon: Lock, title: "Secure Scanning", desc: "Encrypted uploads, isolated processing, zero data retention by default." },
+  {
+    icon: ScanFace,
+    title: "Video Analysis",
+    desc: "Frame-by-frame detection of facial swaps, GAN artifacts, and temporal inconsistencies across all major video formats.",
+  },
+  {
+    icon: ImageIcon,
+    title: "Image Deepfake Detection",
+    desc: "Frame-by-frame detection of facial swaps, GAN artifacts, and temporal inconsistencies across all major videos.",
+  },
+  {
+    icon: AudioLines,
+    title: "Audio Detection",
+    desc: "Frame-by-frame detection of facial swaps, GAN artifacts, and temporal inconsistencies across all video formats.",
+  },
+  {
+    icon: Sparkles,
+    title: "AI - Powered Analysis",
+    desc: "Frame-by-frame detection of facial swaps, GAN artifacts, and temporal inconsistencies across all major video formats.",
+  },
+  {
+    icon: ShieldCheck,
+    title: "Secure Scanning",
+    desc: "Frame-by-frame detection of facial swaps, GAN artifacts, and temporal inconsistencies across all major videos.",
+  },
 ];
 
 const steps = [
-  { icon: Upload, title: "Upload Media", desc: "Drag-and-drop your image, video or audio file." },
-  { icon: Search, title: "AI Scans Content", desc: "Our models inspect pixels, frames and spectrograms." },
-  { icon: FileCheck, title: "Get a Report", desc: "Receive a verdict, confidence score and breakdown." },
+  {
+    n: "01",
+    icon: UploadCloud,
+    title: "Upload your Media",
+    desc: "Simply upload your media file and let our platform securely analyze it for signs of manipulation.",
+  },
+  {
+    n: "02",
+    icon: Cpu,
+    title: "AI Scans Content",
+    desc: "Our AI scans the content for patterns commonly associated with deepfakes and digital manipulation.",
+  },
+  {
+    n: "03",
+    icon: CheckCircle2,
+    title: "Receive your Results",
+    desc: "Receive fast, easy-to-understand results with authenticity scores and risk indicators.",
+  },
 ];
 
 const faqs = [
-  { q: "What file types are supported?", a: "Images (JPG, PNG, WEBP), videos (MP4, MOV) and audio (MP3, WAV)." },
-  { q: "How accurate is TruthLens AI?", a: "Our ensemble achieves over 99% accuracy on benchmark datasets, with full confidence scoring." },
-  { q: "Is my uploaded media stored?", a: "By default, no. Media is processed in isolated containers and discarded after analysis." },
-  { q: "Can I use it for journalism or law enforcement?", a: "Yes. TruthLens powers verification workflows for newsrooms, regulators, and security agencies." },
+  {
+    q: "What files types are supported",
+    a: "TruthLens AI supports a variety of image, video, and audio formats, including JPG, JPEG, PNG, and other commonly used file types for media analysis.",
+  },
+  {
+    q: "How accurate is TruthLens AI",
+    a: "TruthLens AI achieves industry-leading accuracy backed by ongoing research and continuously updated training datasets. Detection confidence varies based on media quality and manipulation complexity.",
+  },
+  {
+    q: "Is my Uploaded Media Stored?",
+    a: "Your uploaded media is processed securely and removed after analysis unless you explicitly choose to keep it in your dashboard.",
+  },
+  {
+    q: "Can i use it for Journalism or Law Enforcement?",
+    a: "Yes — TruthLens is designed to support journalists, investigators, and law-enforcement workflows with detailed authenticity reports and forensic insights.",
+  },
 ];
 
-function Index() {
+function HomePage() {
   return (
-    <PageShell>
-      {/* HERO - simplified, less flashy */}
-      <section className="relative overflow-hidden">
-        <div className="absolute inset-0 grid-bg opacity-20 pointer-events-none" />
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 pt-20 pb-24 md:pt-28 md:pb-32">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="max-w-3xl"
-          >
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-black/50 backdrop-blur-sm border border-[#6699FF]/30 text-xs font-medium text-gray-300 mb-6">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#F7941D]" />
-              <span>NCS × Neo Cloud Technologies</span>
-            </div>
-            <h1
-              className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight leading-[1.05] text-white"
-              style={{ fontFamily: "'Montserrat', sans-serif" }}
+    <SiteLayout>
+      {/* Hero Section — exactly matching Frame 2147227436.png, adjusted for floating navbar */}
+      <section className="relative overflow-hidden bg-gradient-to-b from-[#eef2ff] via-[#f4f6ff] to-background">
+        {/* Light blue grid pattern (clear, airy) */}
+        <div
+          className="absolute inset-0 opacity-[0.35]"
+          style={{
+            backgroundImage:
+              "linear-gradient(to right, rgba(135, 206, 250, 0.2) 1px, transparent 1px), linear-gradient(to bottom, rgba(135, 206, 250, 0.2) 1px, transparent 1px)",
+            backgroundSize: "56px 56px",
+          }}
+        />
+        {/* 
+          Top padding accounts for:
+          - floating navbar height (~64px)
+          - top-6 gap (24px)
+          - additional breathing space to match original composition
+        */}
+        <div className="relative mx-auto mt-30 max-w-5xl px-4 pt-[88px] pb-16 text-center sm:px-6 lg:pt-[120px] lg:pb-24">
+          <div className="flex flex-wrap items-center justify-center gap-2 text-xs font-medium">
+            <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-primary">
+              NCS-Neo Cloud Technologies
+            </span>
+          </div>
+          <h1 className="mt-6 text-4xl font-bold tracking-tight text-foreground sm:text-5xl lg:text-6xl">
+            Verify Media Authenticity
+            <br />
+            with <span className="bg-gradient-to-r from-[#B23200] to-[#251FBA] bg-clip-text text-transparent">AI-Powered Detection</span>
+          </h1>
+          <p className="mx-auto mt-5 max-w-2xl text-base text-muted-foreground sm:text-lg">
+            TruthLens AI analyzes images, videos, and audio for signs of manipulation using advanced AI detection technology. Get clear authenticity insights in seconds.
+          </p>
+          <div className="mt-8 flex justify-center">
+            <Link
+              to="/detect"
+              className="rounded-2xl flex gap-2 bg-primary px-10 py-5 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/25 transition hover:bg-primary/90"
             >
-              Detect AI-Manipulated <br />
-              <span className="gradient-text">Media Instantly</span>
-            </h1>
-            <p className="mt-6 text-lg text-gray-300 max-w-xl">
-              TruthLens AI scans images, videos and audio for deepfake artifacts using a multi-model
-              detection engine. Verify authenticity in seconds.
-            </p>
-            <div className="mt-8 flex flex-wrap gap-3">
-              <Link to="/detect" className="btn-primary">
-                Analyze Media <ChevronRight className="w-4 h-4" />
-              </Link>
-              <Link to="/about" className="btn-outline">
-                Learn More
-              </Link>
-            </div>
-          </motion.div>
-
-          {/* Hero visual - simpler, static illustration */}
-          <div className="relative mt-16 mx-auto max-w-2xl">
-            <div className="glass-strong rounded-2xl p-6 border border-[#6699FF]/20">
-              <div className="flex items-center justify-center gap-4 text-gray-400">
-                <div className="flex items-center gap-2">
-                  <Image className="w-5 h-5 text-[#6699FF]" />
-                  <span className="text-sm">Image</span>
-                </div>
-                <div className="w-px h-4 bg-white/20" />
-                <div className="flex items-center gap-2">
-                  <Video className="w-5 h-5 text-[#6699FF]" />
-                  <span className="text-sm">Video</span>
-                </div>
-                <div className="w-px h-4 bg-white/20" />
-                <div className="flex items-center gap-2">
-                  <Music className="w-5 h-5 text-[#6699FF]" />
-                  <span className="text-sm">Audio</span>
-                </div>
-              </div>
-              <div className="mt-4 text-center text-xs text-gray-500">
-                Upload any media file — get authenticity report in seconds
-              </div>
-            </div>
+              Analyse Media
+              <ChevronRight/>
+            </Link>
           </div>
         </div>
       </section>
 
-      {/* FEATURES */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 py-20">
-        <div className="max-w-2xl mb-12">
-          <h2 
-            className="text-3xl md:text-4xl font-bold tracking-tight text-white"
-            style={{ fontFamily: "'Montserrat', sans-serif" }}
-          >
-            Detection across every <span className="gradient-text">media format</span>
+      {/* Detection Across Every Media Format */}
+      <section className="mx-auto max-w-7xl px-4 py-16 mt-12 sm:px-6 lg:px-8">
+        <div className="mb-10 text-center">
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-gradient-to-r from-[#6699FF] to-[#09255D] text-primary-foreground">
+            <MousePointerClickIcon className="size-7"/>
+          </div>
+          <h2 className="text-2xl font-bold sm:text-3xl">
+            Detection Across Every <span className="bg-gradient-to-r from-[#B23200] to-[#251FBA] bg-clip-text text-transparent">Media Format</span>
           </h2>
-          <p className="mt-3 text-gray-400">
-            A unified detection engine for images, video and audio — engineered for speed, accuracy and trust.
+          <p className="mt-2 text-sm text-muted-foreground">
+            A unified detection engine for images, videos and audio — engineered for speed.
           </p>
         </div>
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {features.map((f, i) => (
-            <motion.div
+
+        <div className="grid gap-4 md:grid-cols-3">
+          {features.map((f) => (
+            <article
               key={f.title}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: i * 0.05 }}
-              className="glass-card"
+              className="rounded-2xl border border-border/70 bg-card p-5 transition hover:border-primary/40 hover:shadow-sm"
             >
-              <div className="w-10 h-10 rounded-lg gradient-primary flex items-center justify-center mb-4">
-                <f.icon className="w-5 h-5 text-white" />
+              <div className="flex items-center gap-2 text-sm font-semibold">
+                <f.icon className="h-4 w-4 text-primary" />
+                {f.title}
               </div>
-              <h3 className="font-semibold text-lg text-white mb-1">{f.title}</h3>
-              <p className="text-sm text-gray-400">{f.desc}</p>
-            </motion.div>
+              <p className="mt-3 text-sm text-muted-foreground">{f.desc}</p>
+              <a href="#" className="mt-4 inline-block text-xs font-semibold text-primary hover:underline">
+                Learn More →
+              </a>
+            </article>
           ))}
         </div>
       </section>
 
-      {/* HOW IT WORKS */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 py-20">
-        <div className="text-center max-w-2xl mx-auto mb-14">
-          <h2 
-            className="text-3xl md:text-4xl font-bold tracking-tight text-white"
-            style={{ fontFamily: "'Montserrat', sans-serif" }}
-          >
-            How It Works
-          </h2>
-          <p className="mt-3 text-gray-400">Three steps from upload to verdict.</p>
-        </div>
-        <div className="grid gap-6 md:grid-cols-3">
-          {steps.map((s, i) => (
-            <div key={s.title} className="glass-card text-center">
-              <div className="w-12 h-12 mx-auto rounded-xl gradient-primary flex items-center justify-center mb-4">
-                <s.icon className="w-5 h-5 text-white" />
-              </div>
-              <div className="text-xs text-gray-400 uppercase tracking-wider mb-1">Step {i + 1}</div>
-              <h3 className="font-semibold text-lg text-white mb-2">{s.title}</h3>
-              <p className="text-sm text-gray-400">{s.desc}</p>
+      {/* Works / Steps section */}
+      <section className="bg-[#f7f8ff]">
+        <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
+          <div className="mb-10 text-center">
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-gradient-to-r from-[#6699FF] to-[#09255D] text-primary-foreground">
+              <MousePointerClickIcon className="size-7"/>
             </div>
-          ))}
-        </div>
-      </section>
+            <h2 className="text-2xl font-bold sm:text-3xl">
+              <span className="text-primary">Works</span>
+            </h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              A simple three-step process designed to help you verify digital content quickly and confidently.
+            </p>
+          </div>
 
-      {/* FAQ */}
-      <section className="max-w-3xl mx-auto px-4 sm:px-6 py-20">
-        <h2 
-          className="text-3xl md:text-4xl font-bold tracking-tight text-center mb-10 text-white"
-          style={{ fontFamily: "'Montserrat', sans-serif" }}
-        >
-          Frequently Asked Questions
-        </h2>
-        <div className="space-y-3">
-          {faqs.map((f, i) => <FaqItem key={i} {...f} />)}
-        </div>
-      </section>
-
-      {/* CTA - simplified */}
-      <section className="max-w-4xl mx-auto px-4 sm:px-6 pb-20">
-        <div className="glass-strong rounded-2xl p-10 text-center border border-[#6699FF]/20">
-          <Eye className="w-8 h-8 mx-auto mb-4 text-[#6699FF]" />
-          <h2 
-            className="text-2xl md:text-3xl font-bold text-white"
-            style={{ fontFamily: "'Montserrat', sans-serif" }}
-          >
-            Ready to verify the truth?
-          </h2>
-          <p className="mt-2 text-gray-400 max-w-md mx-auto">
-            Upload your first file and see TruthLens AI in action.
-          </p>
-          <div className="mt-6 flex justify-center gap-3 flex-wrap">
-            <Link to="/detect" className="btn-primary">Start Detection</Link>
-            <Link to="/register" className="btn-outline">Create Account</Link>
+          <div className="grid gap-4 md:grid-cols-3">
+            {steps.map((s, i) => (
+              <div
+                key={s.n}
+                className={`rounded-2xl border p-6 transition ${
+                  i === 1
+                    ? "border-primary/30 bg-primary/5 shadow-md"
+                    : "border-border/70 bg-card"
+                }`}
+              >
+                <div className="text-4xl font-extrabold text-primary/30">{s.n}</div>
+                <div className="mt-4 inline-flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <s.icon className="h-4 w-4" />
+                </div>
+                <h3 className="mt-4 text-base font-semibold">{s.title}</h3>
+                <p className="mt-2 text-sm text-muted-foreground">{s.desc}</p>
+              </div>
+            ))}
           </div>
         </div>
       </section>
-    </PageShell>
+
+      {/* Asked Questions */}
+      <section className="mx-auto max-w-5xl px-4 py-16 sm:px-6 lg:px-8">
+        <h2 className="text-3xl font-bold">
+          Asked <span className="text-primary">Questions</span>
+        </h2>
+        <div className="mt-8 space-y-3">
+          {faqs.map((f, i) => (
+            <FaqItem key={i} q={f.q} a={f.a} defaultOpen={i === 0} />
+          ))}
+        </div>
+      </section>
+
+      {/* CTA */}
+      <section className="mx-auto max-w-5xl px-4 pb-16 sm:px-6 lg:px-8">
+        <div className="rounded-3xl bg-gradient-to-br from-primary to-[#7a92ff] p-10 text-center text-primary-foreground shadow-xl shadow-primary/25">
+          <h3 className="text-2xl font-bold sm:text-3xl">Ready to verify the truth?</h3>
+          <p className="mx-auto mt-2 max-w-xl text-sm text-primary-foreground/80">
+            Upload your first file and get fast, reliable authenticity analysis from TruthLens AI.
+          </p>
+          <div className="mt-6">
+            <Link
+              to="/detect"
+              className="inline-block rounded-full bg-white px-6 py-3 text-sm font-semibold text-primary shadow-sm hover:bg-white/90 transition"
+            >
+              Start Dectection
+            </Link>
+          </div>
+        </div>
+      </section>
+    </SiteLayout>
   );
 }
 
-function FaqItem({ q, a }: { q: string; a: string }) {
-  const [open, setOpen] = useState(false);
+function FaqItem({ q, a, defaultOpen = false }: { q: string; a: string; defaultOpen?: boolean }) {
+  const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className="glass-card overflow-hidden p-0">
-      <button 
-        onClick={() => setOpen(!open)} 
-        className="w-full flex items-center justify-between px-5 py-4 text-left hover:text-[#6699FF] transition-colors"
+    <div className="rounded-xl border border-border/70 bg-card">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left"
       >
-        <span className="font-medium text-white">{q}</span>
-        <ChevronDown className={`w-4 h-4 text-[#6699FF] transition-transform ${open ? "rotate-180" : ""}`} />
+        <span className="text-sm font-medium">{q}</span>
+        <ChevronDown
+          className={`h-4 w-4 shrink-0 text-muted-foreground transition ${open ? "rotate-180" : ""}`}
+        />
       </button>
-      <motion.div
-        initial={false}
-        animate={{ height: open ? "auto" : 0, opacity: open ? 1 : 0 }}
-        className="overflow-hidden"
-      >
-        <div className="px-5 pb-4 text-sm text-gray-400">{a}</div>
-      </motion.div>
+      {open && <p className="px-5 pb-4 text-sm text-muted-foreground">{a}</p>}
     </div>
   );
 }

@@ -1,164 +1,94 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState, type ChangeEvent } from "react";
-import { PageShell } from "@/components/PageShell";
-import { Mail, Lock, User, ShieldCheck, type LucideIcon } from "lucide-react";
-import { api } from "@/api/axiosClient";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { SiteLayout } from "@/components/SiteLayout";
 
 export const Route = createFileRoute("/register")({
+  head: () => ({
+    meta: [
+      { title: "Create your account · TruthLens" },
+      { name: "description", content: "Get started with TruthLens — verify media authenticity in seconds." },
+      { property: "og:title", content: "Register · TruthLens" },
+      { property: "og:description", content: "Create your TruthLens account." },
+    ],
+  }),
   component: RegisterPage,
 });
 
-type FieldProps = {
-  icon: LucideIcon;
-  type?: string;
-  placeholder?: string;
-  value: string;
-  onChange: (e: ChangeEvent<HTMLInputElement>) => void;
-  required?: boolean;
-};
-
-function Field({ icon: Icon, ...props }: FieldProps) {
+function RegisterPage() {
   return (
-    <div className="relative">
-      <Icon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-      <input {...props} className="register-input" />
+    <SiteLayout>
+      <section className="mx-auto grid min-h-[calc(100vh-4rem)] max-w-6xl gap-0 px-0 md:grid-cols-2">
+        {/* Left */}
+        <div className="flex flex-col justify-center bg-[#f4f6ff] px-6 py-12 sm:px-12">
+          <h1 className="text-3xl font-bold sm:text-4xl">
+            Get Started with
+            <br />
+            <span className="text-primary">TruthLens.</span>
+          </h1>
+          <p className="mt-4 max-w-md text-sm text-muted-foreground">
+            Detect manipulated content, reduce misinformation, and verify authenticity before you trust or share.
+          </p>
+        </div>
+
+        {/* Right - form */}
+        <div className="flex flex-col justify-center px-6 py-12 sm:px-12">
+          <div className="mx-auto w-full max-w-sm">
+            <h2 className="text-2xl font-bold">Create your account</h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Start verifying deepfakes in minutes.
+            </p>
+
+            <form className="mt-6 space-y-4">
+              <Field label="Email" type="email" placeholder="Enter your email" />
+              <Field label="Password" type="password" placeholder="Enter your password" />
+              <div className="flex items-center justify-between text-xs">
+                <label className="inline-flex items-center gap-2 text-muted-foreground">
+                  <input type="checkbox" className="rounded border-input" /> Remember me
+                </label>
+                <a href="#" className="text-primary hover:underline">Forgot Password?</a>
+              </div>
+              <button
+                type="submit"
+                className="w-full rounded-md bg-primary py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
+              >
+                Create Account
+              </button>
+            </form>
+
+            <div className="my-4 text-center text-xs text-muted-foreground">Or</div>
+
+            <div className="space-y-2">
+              <SocialBtn>Continue with Google</SocialBtn>
+              <SocialBtn>Continue with Apple</SocialBtn>
+            </div>
+
+            <p className="mt-6 text-center text-xs text-muted-foreground">
+              Already have an account?{" "}
+              <Link to="/login" className="text-primary hover:underline">Login</Link>
+            </p>
+          </div>
+        </div>
+      </section>
+    </SiteLayout>
+  );
+}
+
+function Field({ label, type, placeholder }: { label: string; type: string; placeholder: string }) {
+  return (
+    <div>
+      <label className="text-xs font-medium text-foreground/80">{label}</label>
+      <input
+        type={type}
+        placeholder={placeholder}
+        className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+      />
     </div>
   );
 }
 
-function RegisterPage() {
-  const navigate = useNavigate();
-  const [fullName, setFullName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [agreeTerms, setAgreeTerms] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState("");
-
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setError("");
-
-    if (!agreeTerms) {
-      setError("You must agree to the Terms and Privacy Policy.");
-      return;
-    }
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters.");
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      // Direct post network transaction using your axial base layer configuration
-      const response = await api.post("/auth/register", {
-        fullName,
-        email,
-        password,
-      });
-
-      if (response.data.success) {
-        // Cache the signed JWT access authorization string securely in the browser environment
-        localStorage.setItem("token", response.data.token);
-        
-        // Advance the session securely straight into the monetization funnel
-        navigate({ to: "/pricing" });
-      }
-    } catch (err: any) {
-      console.error("🔴 Registration Network Failure:", err);
-      const serverMessage = err.response?.data?.message || "Registration failed. Please try again.";
-      setError(serverMessage);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
+function SocialBtn({ children }: { children: React.ReactNode }) {
   return (
-    <PageShell hideFooter>
-      <style>{`
-        .register-input {
-          background: rgba(0, 0, 0, 0.6);
-          border: 1px solid rgba(102, 153, 255, 0.2);
-          border-radius: 0.75rem;
-          padding: 0.75rem 0.75rem 0.75rem 2.5rem;
-          width: 100%;
-          color: white;
-          font-size: 0.875rem;
-          transition: all 0.2s;
-        }
-        .register-input:focus {
-          outline: none;
-          border-color: #6699FF;
-        }
-        .register-input::placeholder {
-          color: #6b7280;
-        }
-      `}</style>
-
-      <section className="max-w-md mx-auto px-4 pt-16 pb-20">
-        <div className="glass-card p-8">
-          <div className="w-12 h-12 rounded-xl gradient-primary flex items-center justify-center mx-auto mb-5">
-            <ShieldCheck className="w-6 h-6 text-white" />
-          </div>
-          <h1 className="text-2xl font-bold text-center text-white" style={{ fontFamily: "'Montserrat', sans-serif" }}>
-            Create your account
-          </h1>
-          <p className="text-sm text-gray-400 text-center mt-1">
-            Start detecting deepfakes in minutes.
-          </p>
-
-          <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
-            {error && (
-              <div className="text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded-lg p-2 text-center">
-                {error}
-              </div>
-            )}
-            <Field
-              icon={User}
-              type="text"
-              placeholder="Full Name"
-              value={fullName}
-              onChange={(e: ChangeEvent<HTMLInputElement>) => setFullName(e.target.value)}
-              required
-            />
-            <Field
-              icon={Mail}
-              type="email"
-              placeholder="Email address"
-              value={email}
-              onChange={(e: ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)}
-              required
-            />
-            <Field
-              icon={Lock}
-              type="password"
-              placeholder="Password (min. 6 characters)"
-              value={password}
-              onChange={(e: ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)}
-              required
-            />
-            <label className="flex items-start gap-2 text-xs text-gray-400">
-              <input
-                type="checkbox"
-                className="mt-0.5 accent-[#6699FF]"
-                checked={agreeTerms}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAgreeTerms(e.target.checked)}
-              />
-              I agree to the Terms and Privacy Policy.
-            </label>
-            <button type="submit" disabled={isLoading} className="btn-primary w-full">
-              {isLoading ? "Creating account..." : "Create Account"}
-            </button>
-          </form>
-
-          <div className="text-center text-sm text-gray-400 mt-6">
-            Already have an account?{" "}
-            <Link to="/login" className="gradient-text font-semibold">
-              Login
-            </Link>
-          </div>
-        </div>
-      </section>
-    </PageShell>
+    <button className="w-full rounded-md border border-input bg-background py-2 text-xs font-medium hover:bg-secondary">
+      {children}
+    </button>
   );
 }
