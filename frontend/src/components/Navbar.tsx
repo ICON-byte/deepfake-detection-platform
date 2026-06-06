@@ -1,9 +1,14 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useLocation } from "@tanstack/react-router";
 import { useState } from "react";
 import { Menu, X } from "lucide-react";
 
 export function Navbar() {
   const [open, setOpen] = useState(false);
+  const location = useLocation();
+  
+  // Check if the current route is exactly the landing page
+  const isLandingPage = location.pathname === "/";
+
   const nav = [
     { to: "/", label: "Home" },
     { to: "/about", label: "About" },
@@ -11,12 +16,18 @@ export function Navbar() {
   ] as const;
 
   return (
-    <header className="fixed left-1/2 top-6 z-50 w-[calc(100%-2rem)] max-w-7xl -translate-x-1/2 rounded-2xl border border-[#6699ff]/20 bg-[#6699ff]/15 shadow-sm backdrop-blur-md">
+    <header
+      className={`fixed left-1/2 top-3 z-50 w-[calc(100%-1rem)] max-w-7xl -translate-x-1/2 rounded-2xl border transition-colors duration-200 sm:top-6 sm:w-[calc(100%-2rem)] ${
+        isLandingPage
+          ? "border-gray-200 bg-white shadow-md" 
+          : "border-[#6699ff]/20 bg-[#6699ff]/15 shadow-sm backdrop-blur-md"
+      }`}
+    >
       {/* Desktop layout: left (logo), center (nav links), right (buttons) */}
-      <div className="flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
+      <div className="flex h-14 items-center justify-between px-3 sm:h-16 sm:px-6 lg:px-8">
         {/* Logo - left */}
-        <Link to="/" className="text-xl font-semibold tracking-tight text-foreground shrink-0">
-          <img src="/images/logo.png" alt="Logo" />
+        <Link to="/" className="shrink-0 text-xl font-semibold tracking-tight text-foreground">
+          <img src="/images/logo.svg" alt="Logo" className="h-9 w-auto sm:h-auto" />
         </Link>
 
         {/* Navigation links - centered (hidden on mobile) */}
@@ -28,7 +39,7 @@ export function Navbar() {
               activeOptions={{ exact: true }}
               className="rounded-full px-4 py-1.5 text-sm font-medium text-foreground/80 transition-colors hover:text-foreground"
               activeProps={{
-                className: "rounded-full border border-[#6699ff] bg-white/45 px-4 py-1.5 text-sm font-medium text-[#6699ff] shadow-sm",
+                className: "rounded-lg border border-[#6699ff] bg-white/45 px-4 py-1.5 text-sm font-medium text-[#6699ff] shadow-sm",
               }}
             >
               {n.label}
@@ -46,7 +57,7 @@ export function Navbar() {
           </Link>
           <Link
             to="/register"
-            className="rounded-full bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
+            className="rounded-lg bg-[#6699ff] px-4 py-1.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-[#6699ff]/90"
           >
             Register
           </Link>
@@ -64,7 +75,9 @@ export function Navbar() {
 
       {/* Mobile dropdown menu */}
       {open && (
-        <div className="border-t border-[#6699ff]/20 bg-white/90 backdrop-blur-md md:hidden">
+        <div className={`border-t rounded-b-2xl backdrop-blur-md md:hidden ${
+          isLandingPage ? "border-gray-100 bg-white" : "border-[#6699ff]/20 bg-white/90"
+        }`}>
           <div className="flex flex-col gap-1 px-4 py-3">
             {nav.map((n) => (
               <Link
@@ -86,7 +99,7 @@ export function Navbar() {
             <Link
               to="/register"
               onClick={() => setOpen(false)}
-              className="rounded-md bg-primary px-3 py-2 text-center text-sm font-medium text-primary-foreground"
+              className="rounded-md bg-[#6699ff] px-3 py-2 text-center text-sm font-medium text-white"
             >
               Register
             </Link>

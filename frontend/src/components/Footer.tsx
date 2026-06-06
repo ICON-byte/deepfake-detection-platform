@@ -7,11 +7,11 @@ export function Footer() {
       <div className="mx-auto max-w-[90rem] px-3 pb-6 pt-10 sm:px-4 lg:px-6">
         {/* Boxed container for footer content */}
         <div className="rounded-2xl border border-border/80 bg-card/50 p-5 shadow-sm backdrop-blur-sm sm:p-6">
-          <div className="grid gap-10 md:grid-cols-3">
+          <div className="grid gap-8 md:grid-cols-3 md:gap-10">
             {/* Brand column */}
             <div>
               <div className="text-2xl font-semibold tracking-tight">
-                <img src="/images/logo.png" alt="Logo" />
+                <img src="/images/logo.svg" alt="Logo" />
               </div>
               <p className="mt-3 max-w-sm text-sm text-muted-foreground">
                 AI-Powered deepfake detection platform protecting media authenticity across images, videos and audio.
@@ -30,7 +30,7 @@ export function Footer() {
             </div>
 
             {/* Links columns */}
-            <div className="grid grid-cols-2 gap-8 md:col-span-2 md:justify-end">
+            <div className="grid gap-8 sm:grid-cols-2 md:col-span-2 md:justify-end">
               <div>
                 <h4 className="text-sm font-semibold text-foreground">Platform</h4>
                 <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
@@ -65,7 +65,7 @@ export function Footer() {
           </div>
 
           {/* Copyright row */}
-          <div className="mt-8 flex flex-col items-start justify-between gap-2 border-t border-border/60 pt-6 text-xs text-muted-foreground sm:flex-row sm:items-center">
+          <div className="mt-8 flex flex-col items-start justify-between gap-2 border-t border-border/60 pt-6 text-xs text-muted-foreground sm:flex-row sm:items-center sm:gap-4">
             <p>© 2026 TruthLens AI · Nigerian Computer Society (NCS)</p>
             <p>
               Developed by{" "}
@@ -78,7 +78,7 @@ export function Footer() {
 
         {/* Large background watermark (still visible outside the box) */}
         <div className="pointer-events-none mt-6 select-none overflow-hidden text-center">
-          <p className="bg-gradient-to-b from-primary/15 to-transparent bg-clip-text text-[14vw] font-extrabold leading-none tracking-tighter text-transparent sm:text-[13vw] lg:text-[12vw]">
+          <p className="bg-gradient-to-b from-primary/15 to-transparent bg-clip-text text-[13vw] font-extrabold leading-none tracking-tighter text-transparent sm:text-[12vw] lg:text-[11vw]">
             TRUTHLENS
           </p>
         </div>
