@@ -11,7 +11,7 @@ export function Navbar() {
   ] as const;
 
   return (
-    <header className="fixed left-1/2 top-6 z-50 w-[calc(100%-2rem)] max-w-7xl -translate-x-1/2 rounded-2xl border border-border/60 bg-white/80 backdrop-blur-sm shadow-sm">
+    <header className="fixed left-1/2 top-6 z-50 w-[calc(100%-2rem)] max-w-7xl -translate-x-1/2 rounded-2xl border border-[#6699ff]/20 bg-[#6699ff]/15 shadow-sm backdrop-blur-md">
       {/* Desktop layout: left (logo), center (nav links), right (buttons) */}
       <div className="flex h-16 items-center justify-between px-4 sm:px-6 lg:px-8">
         {/* Logo - left */}
@@ -28,7 +28,7 @@ export function Navbar() {
               activeOptions={{ exact: true }}
               className="rounded-full px-4 py-1.5 text-sm font-medium text-foreground/80 transition-colors hover:text-foreground"
               activeProps={{
-                className: "rounded-full bg-white px-4 py-1.5 text-sm font-medium text-primary shadow-sm",
+                className: "rounded-full border border-[#6699ff] bg-white/45 px-4 py-1.5 text-sm font-medium text-[#6699ff] shadow-sm",
               }}
             >
               {n.label}
@@ -64,7 +64,7 @@ export function Navbar() {
 
       {/* Mobile dropdown menu */}
       {open && (
-        <div className="border-t border-border/60 bg-white md:hidden">
+        <div className="border-t border-[#6699ff]/20 bg-white/90 backdrop-blur-md md:hidden">
           <div className="flex flex-col gap-1 px-4 py-3">
             {nav.map((n) => (
               <Link

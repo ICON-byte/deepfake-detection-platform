@@ -4,9 +4,9 @@ import { Globe, Mail, MessageCircle } from "lucide-react";
 export function Footer() {
   return (
     <footer className="border-t border-border/60 bg-background">
-      <div className="mx-auto max-w-7xl px-4 pb-6 pt-12 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-[90rem] px-3 pb-6 pt-10 sm:px-4 lg:px-6">
         {/* Boxed container for footer content */}
-        <div className="rounded-2xl border border-border/80 bg-card/50 p-6 shadow-sm backdrop-blur-sm sm:p-8">
+        <div className="rounded-2xl border border-border/80 bg-card/50 p-5 shadow-sm backdrop-blur-sm sm:p-6">
           <div className="grid gap-10 md:grid-cols-3">
             {/* Brand column */}
             <div>
@@ -40,16 +40,6 @@ export function Footer() {
                     </Link>
                   </li>
                   <li>
-                    <a href="#" className="transition-colors hover:text-primary">
-                      Dashboard
-                    </a>
-                  </li>
-                  <li>
-                    <a href="#" className="transition-colors hover:text-primary">
-                      History
-                    </a>
-                  </li>
-                  <li>
                     <Link to="/about" className="transition-colors hover:text-primary">
                       About
                     </Link>
@@ -68,11 +58,6 @@ export function Footer() {
                     <Link to="/register" className="transition-colors hover:text-primary">
                       Register
                     </Link>
-                  </li>
-                  <li>
-                    <a href="#" className="transition-colors hover:text-primary">
-                      Profile
-                    </a>
                   </li>
                 </ul>
               </div>
@@ -93,7 +78,7 @@ export function Footer() {
 
         {/* Large background watermark (still visible outside the box) */}
         <div className="pointer-events-none mt-6 select-none overflow-hidden text-center">
-          <p className="bg-gradient-to-b from-primary/15 to-transparent bg-clip-text text-[18vw] font-extrabold leading-none tracking-tighter text-transparent">
+          <p className="bg-gradient-to-b from-primary/15 to-transparent bg-clip-text text-[14vw] font-extrabold leading-none tracking-tighter text-transparent sm:text-[13vw] lg:text-[12vw]">
             TRUTHLENS
           </p>
         </div>
