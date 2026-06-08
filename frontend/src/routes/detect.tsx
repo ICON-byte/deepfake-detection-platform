@@ -1,4 +1,4 @@
-﻿import { createFileRoute } from "@tanstack/react-router";
+﻿import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { SiteLayout } from "@/components/SiteLayout";
 import { UploadCloud, ShieldCheck, FileText, RotateCcw } from "lucide-react";
 import { useState } from "react";
@@ -109,7 +109,15 @@ function PanelCard({ title, children }: { title: string; children: React.ReactNo
   );
 }
 
-function Dropzone() {
+function Dropzone({ detectionMode }: { detectionMode?: 'image' | 'video' | 'audio' | 'text' }) {
+  const navigate = useNavigate();
+
+  const handleFile = (file?: File) => {
+    if (!file) return;
+    // Navigate to a demo result so you can preview the results page immediately
+    navigate({ to: '/result', search: (s) => ({ ...s, scanId: 'demo' }) });
+  };
+
   return (
     <>
       <p className="mt-2 text-sm text-muted-foreground">Upload Media file and run deepfake detection analysis.</p>
@@ -119,7 +127,11 @@ function Dropzone() {
         <p className="mt-1 text-sm text-muted-foreground">
           Or <span className="text-[#6699ff] underline">choose file</span> from your device
         </p>
-        <input type="file" className="hidden" />
+        <input
+          type="file"
+          className="hidden"
+          onChange={(e) => handleFile(e.target.files ? e.target.files[0] : undefined)}
+        />
       </label>
       <div className="mt-3 flex flex-col gap-1 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
         <span>Supported Formats: JPEG, PNG, WEBP</span>
@@ -132,7 +144,7 @@ function Dropzone() {
 function DeepfakePanel() {
   return (
     <PanelCard title="Deepfake Detection">
-      <Dropzone />
+      <Dropzone detectionMode="image" />
     </PanelCard>
   );
 }
@@ -172,7 +184,7 @@ function AiPanel() {
       </div>
       
       {mode === "file" ? (
-        <Dropzone />
+        <Dropzone detectionMode="image" />
       ) : (
         <textarea
           rows={6}
