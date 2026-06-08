@@ -19,14 +19,12 @@ export const Route = createFileRoute("/detect")({
       { title: "Detect · TruthLens" },
       {
         name: "description",
-        content:
-          "Run TruthLens deepfake, AI-generated content, and phishing analysis.",
+        content: "Run TruthLens deepfake, AI-generated content, and phishing analysis.",
       },
       { property: "og:title", content: "TruthLens Detect" },
       {
         property: "og:description",
-        content:
-          "Verify media files, text and suspicious URLs in seconds.",
+        content: "Verify media files, text and suspicious URLs in seconds.",
       },
     ],
   }),
@@ -44,15 +42,13 @@ function DetectPage() {
         <div className="relative mx-auto max-w-5xl px-3 pb-12 pt-28 sm:px-6 sm:pt-32 lg:px-8">
           <div className="text-center">
             <span className="inline-flex max-w-full items-center gap-2 rounded-full border border-[#6699ff]/30 bg-[#6699ff]/5 px-4 py-1.5 text-sm font-medium text-[#6699ff]">
-              <ShieldCheck className="h-4 w-4" /> Multiple detection workflows
-              for media and suspicious links.
+              <ShieldCheck className="h-4 w-4" /> Multiple detection workflows for media and
+              suspicious links.
             </span>
-            <h1 className="mt-5 text-3xl font-bold sm:text-5xl">
-              TruthLens Detect
-            </h1>
+            <h1 className="mt-5 text-3xl font-bold sm:text-5xl">TruthLens Detect</h1>
             <p className="mx-auto mt-4 max-w-2xl text-base text-muted-foreground sm:text-lg">
-              Select a workflow below, then upload files or paste content for
-              real-time deepfake, AI, and phishing analysis.
+              Select a workflow below, then upload files or paste content for real-time deepfake,
+              AI, and phishing analysis.
             </p>
           </div>
 
@@ -100,7 +96,15 @@ function GreyBlockBackground() {
   );
 }
 
-function TabBtn({ active, children, onClick }: { active: boolean; children: React.ReactNode; onClick: () => void }) {
+function TabBtn({
+  active,
+  children,
+  onClick,
+}: {
+  active: boolean;
+  children: React.ReactNode;
+  onClick: () => void;
+}) {
   return (
     <button
       onClick={onClick}
@@ -115,7 +119,15 @@ function TabBtn({ active, children, onClick }: { active: boolean; children: Reac
   );
 }
 
-function PanelCard({ title, children, icon }: { title: string; children: React.ReactNode; icon?: React.ReactNode }) {
+function PanelCard({
+  title,
+  children,
+  icon,
+}: {
+  title: string;
+  children: React.ReactNode;
+  icon?: React.ReactNode;
+}) {
   return (
     <div className="rounded-2xl border border-border/70 bg-card p-4 shadow-sm sm:p-6">
       <div className="flex flex-wrap items-center gap-2 text-base">
@@ -221,9 +233,11 @@ function DeepfakePanel() {
           data: {
             isDeepfake: result.data.status === "Manipulated",
             confidence: result.data.confidenceScore / 100,
-            details: result.message || (result.data.status === "Manipulated"
-              ? "Multiple manipulation traces detected including inconsistent lighting and warped facial features."
-              : "No significant deepfake patterns found. Image appears authentic."),
+            details:
+              result.message ||
+              (result.data.status === "Manipulated"
+                ? "Multiple manipulation traces detected including inconsistent lighting and warped facial features."
+                : "No significant deepfake patterns found. Image appears authentic."),
           },
           fileName: file.name,
           timestamp: new Date().toISOString(),
@@ -246,8 +260,8 @@ function DeepfakePanel() {
           isAnalyzing
             ? "border-[#6699ff]/40 bg-[#6699ff]/5"
             : file
-            ? "border-[#6699ff]/70 bg-[#6699ff]/15"
-            : "border-[#6699ff]/40 bg-[#6699ff]/10 hover:border-[#6699ff]/70 hover:bg-[#6699ff]/15"
+              ? "border-[#6699ff]/70 bg-[#6699ff]/15"
+              : "border-[#6699ff]/40 bg-[#6699ff]/10 hover:border-[#6699ff]/70 hover:bg-[#6699ff]/15"
         } px-4 py-8 text-center`}
         onClick={() => !isAnalyzing && fileInputRef.current?.click()}
       >
@@ -339,7 +353,12 @@ function AiPanel() {
   }, [previewUrl]);
 
   const handleFileSelect = async (selectedFile: File | null) => {
-    if (selectedFile && (selectedFile.type.startsWith("image/") || selectedFile.type.startsWith("video/") || selectedFile.type === "text/plain")) {
+    if (
+      selectedFile &&
+      (selectedFile.type.startsWith("image/") ||
+        selectedFile.type.startsWith("video/") ||
+        selectedFile.type === "text/plain")
+    ) {
       setIsUploading(true);
       await new Promise((resolve) => setTimeout(resolve, 1200));
       if (previewUrl) URL.revokeObjectURL(previewUrl);
@@ -436,7 +455,8 @@ function AiPanel() {
           fileUrl: finalFileUrl,
           s3Key: finalS3Key,
           fileName: finalFileName,
-          detectionMode: mode === "file" ? (file?.type.startsWith("video/") ? "video" : "image") : "text",
+          detectionMode:
+            mode === "file" ? (file?.type.startsWith("video/") ? "video" : "image") : "text",
         }),
       });
       const result = await analyzeRequest.json();
@@ -451,9 +471,11 @@ function AiPanel() {
           data: {
             isAIGenerated: result.data.status === "Manipulated",
             confidence: result.data.confidenceScore / 100,
-            details: result.message || (result.data.status === "Manipulated"
-              ? "Synthetic artifacts detected consistent with AI generation."
-              : "Likely human-created content."),
+            details:
+              result.message ||
+              (result.data.status === "Manipulated"
+                ? "Synthetic artifacts detected consistent with AI generation."
+                : "Likely human-created content."),
           },
           fileName: finalFileName,
           timestamp: new Date().toISOString(),
@@ -479,7 +501,9 @@ function AiPanel() {
               resetAnalysis();
             }}
             className={`py-2 px-4 text-xs font-medium rounded-full transition-all duration-200 select-none ${
-              mode === "file" ? "bg-[#6699ff] text-white shadow-sm" : "text-gray-500 hover:text-gray-800 bg-transparent"
+              mode === "file"
+                ? "bg-[#6699ff] text-white shadow-sm"
+                : "text-gray-500 hover:text-gray-800 bg-transparent"
             }`}
           >
             File Upload
@@ -490,7 +514,9 @@ function AiPanel() {
               resetAnalysis();
             }}
             className={`py-2 px-4 text-xs font-medium rounded-full transition-all duration-200 select-none ${
-              mode === "text" ? "bg-[#6699ff] text-white shadow-sm" : "text-gray-500 hover:text-gray-800 bg-transparent"
+              mode === "text"
+                ? "bg-[#6699ff] text-white shadow-sm"
+                : "text-gray-500 hover:text-gray-800 bg-transparent"
             }`}
           >
             Text Input
@@ -505,8 +531,8 @@ function AiPanel() {
               isAnalyzing
                 ? "border-[#6699ff]/40 bg-[#6699ff]/5"
                 : file
-                ? "border-[#6699ff]/70 bg-[#6699ff]/15"
-                : "border-[#6699ff]/40 bg-[#6699ff]/10 hover:border-[#6699ff]/70 hover:bg-[#6699ff]/15"
+                  ? "border-[#6699ff]/70 bg-[#6699ff]/15"
+                  : "border-[#6699ff]/40 bg-[#6699ff]/10 hover:border-[#6699ff]/70 hover:bg-[#6699ff]/15"
             } px-4 py-8 text-center`}
             onClick={() => !isAnalyzing && fileInputRef.current?.click()}
           >
@@ -565,7 +591,9 @@ function AiPanel() {
               disabled={isUploading || isAnalyzing}
             />
           </div>
-          <div className="mt-3 text-sm text-muted-foreground">Supported: Images (JPG, PNG, WEBP) or .txt files</div>
+          <div className="mt-3 text-sm text-muted-foreground">
+            Supported: Images (JPG, PNG, WEBP) or .txt files
+          </div>
         </>
       ) : (
         // Text mode with loader during analysis
@@ -598,14 +626,16 @@ function AiPanel() {
         </>
       )}
 
-      {((mode === "file" && file) || (mode === "text" && textContent.trim())) && !isAnalyzing && !isUploading && (
-        <button
-          onClick={handleAnalyze}
-          className="mt-5 rounded-full bg-[#6699ff] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[#6699ff]/90 transition-all"
-        >
-          Analyze Content
-        </button>
-      )}
+      {((mode === "file" && file) || (mode === "text" && textContent.trim())) &&
+        !isAnalyzing &&
+        !isUploading && (
+          <button
+            onClick={handleAnalyze}
+            className="mt-5 rounded-full bg-[#6699ff] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[#6699ff]/90 transition-all"
+          >
+            Analyze Content
+          </button>
+        )}
     </PanelCard>
   );
 }
@@ -643,9 +673,21 @@ function PhishingPanel() {
       setStatusMessage(step.message);
     }
     const urlLower = url.toLowerCase();
-    const suspiciousKeywords = ["verify", "secure", "login", "account", "update", "confirm", "bank", "paypal", "apple"];
-    const suspiciousScore = suspiciousKeywords.filter((k) => urlLower.includes(k)).length / suspiciousKeywords.length;
-    const isMalicious = suspiciousScore > 0.3 || urlLower.includes("-verify-") || urlLower.includes("secure-");
+    const suspiciousKeywords = [
+      "verify",
+      "secure",
+      "login",
+      "account",
+      "update",
+      "confirm",
+      "bank",
+      "paypal",
+      "apple",
+    ];
+    const suspiciousScore =
+      suspiciousKeywords.filter((k) => urlLower.includes(k)).length / suspiciousKeywords.length;
+    const isMalicious =
+      suspiciousScore > 0.3 || urlLower.includes("-verify-") || urlLower.includes("secure-");
     const confidence = 0.6 + suspiciousScore * 0.4;
     const riskLevel = confidence > 0.8 ? "high" : confidence > 0.55 ? "medium" : "low";
     setIsAnalyzing(false);
@@ -674,7 +716,10 @@ function PhishingPanel() {
         Submit a suspicious URL for instant risk assessment and threat intelligence check.
       </p>
 
-      <label htmlFor="phishing-url" className="mt-4 block text-sm font-medium text-muted-foreground">
+      <label
+        htmlFor="phishing-url"
+        className="mt-4 block text-sm font-medium text-muted-foreground"
+      >
         URL Link
       </label>
       <div className="mt-2 flex items-center gap-2 rounded-xl border border-input bg-background px-3 py-2">
