@@ -64,13 +64,8 @@ function LoginPage() {
 
   return (
     <SiteLayout>
-      <section className="mx-auto grid min-h-[calc(100vh-4rem)] max-w-6xl gap-0 px-0 pt-30 md:grid-cols-2">
-        <div className="flex flex-col justify-center bg-[#f4f6ff] px-6 py-12 pt-100 sm:px-12">
-          <div className="mb-20">
-            <div className="absolute top-50 left-25">
-              <img src="/images/logo.svg" alt="TruthLens" className="h-10 w-auto" />
-            </div>
-          </div>
+      <section className="mx-auto min-h-[calc(100vh-4rem)] max-w-6xl px-4 pt-28 pb-16 md:grid md:grid-cols-2 md:gap-12 md:pt-32 md:pb-24">
+        <div className="flex flex-col justify-center rounded-3xl bg-[#f4f6ff] p-10 sm:p-14">
           <h1 className="text-3xl font-bold sm:text-4xl">
             Welcome back to
             <br />
@@ -81,7 +76,7 @@ function LoginPage() {
           </p>
         </div>
 
-        <div className="flex flex-col justify-center px-6 py-12 sm:px-12">
+        <div className="flex flex-col justify-start px-4 pt-20 pb-10 sm:px-8 sm:pt-24">
           <div className="mx-auto w-full max-w-sm">
             <h2 className="text-2xl font-bold">Sign in</h2>
             <p className="mt-1 text-xs text-muted-foreground">
