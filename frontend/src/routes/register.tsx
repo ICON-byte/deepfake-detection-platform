@@ -22,7 +22,7 @@ function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [formData, setFormData] = useState({
-    fullName: "",
+    username: "",
     email: "",
     password: "",
     confirmPassword: "",
@@ -33,7 +33,6 @@ function RegisterPage() {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
-    // Clear error when user starts typing
     if (error) setError("");
   };
 
@@ -41,7 +40,7 @@ function RegisterPage() {
     e.preventDefault();
 
     // Client-side validation
-    if (!formData.fullName || !formData.email || !formData.password) {
+    if (!formData.username || !formData.email || !formData.password) {
       setError("Please fill in all required fields.");
       return;
     }
@@ -64,7 +63,7 @@ function RegisterPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          fullName: formData.fullName,
+          username: formData.username,
           email: formData.email,
           password: formData.password,
         }),
@@ -76,13 +75,12 @@ function RegisterPage() {
         throw new Error(data.message || "Registration failed");
       }
 
-      // Store token (adjust key as needed)
+      // Store auth session details safely
       localStorage.setItem("truthlens_token", data.token);
-      // Optionally store user info
       localStorage.setItem("truthlens_user", JSON.stringify(data.user));
 
-      // Redirect to dashboard or home page
-      navigate({ to: "/detect" }); // Change to your desired route
+      // Redirect to detection gateway
+      navigate({ to: "/detect" });
     } catch (err: any) {
       setError(err.message || "Something went wrong. Please try again.");
     } finally {
@@ -93,11 +91,11 @@ function RegisterPage() {
   return (
     <SiteLayout>
       <section className="mx-auto grid min-h-[calc(100vh-4rem)] max-w-6xl gap-0 px-0 pt-30 md:grid-cols-2">
-        {/* Left */}
+        {/* Left Panel */}
         <div className="flex flex-col justify-start bg-[#f4f6ff] px-6 pt-120 pb-12 sm:px-12">
           <div className="mb-20">
             <div className="absolute top-50 left-25">
-              <img src="/images/logo.svg" alt="NeoCloud" className="h-10 w-auto" />
+              <img src="/images/logo.svg" alt="TruthLens" className="h-10 w-auto" />
             </div>
           </div>
           <h1 className="text-3xl font-bold sm:text-4xl">
@@ -111,7 +109,7 @@ function RegisterPage() {
           </p>
         </div>
 
-        {/* Right - form */}
+        {/* Right Panel - Interactive Form */}
         <div className="flex flex-col justify-center px-6 py-12 sm:px-12">
           <div className="mx-auto w-full max-w-sm">
             <h2 className="text-2xl font-bold text-gray-900">
@@ -128,10 +126,10 @@ function RegisterPage() {
             )}
 
             <form className="mt-6 space-y-5" onSubmit={handleSubmit}>
-              {/* Full Name */}
+              {/* Username Input */}
               <div>
                 <label className="block text-sm font-medium text-gray-900 mb-2">
-                  Full Name
+                  Username
                 </label>
                 <div className="relative">
                   <svg
@@ -149,16 +147,16 @@ function RegisterPage() {
                   </svg>
                   <input
                     type="text"
-                    name="fullName"
-                    value={formData.fullName}
+                    name="username"
+                    value={formData.username}
                     onChange={handleChange}
-                    placeholder="John Doe"
+                    placeholder="johndoe"
                     className="w-full rounded-lg border border-gray-200 bg-white pl-10 pr-4 py-3 text-sm text-gray-900 placeholder:text-gray-400 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
                   />
                 </div>
               </div>
 
-              {/* Email */}
+              {/* Email Input */}
               <div>
                 <label className="block text-sm font-medium text-gray-900 mb-2">
                   Email
@@ -188,7 +186,7 @@ function RegisterPage() {
                 </div>
               </div>
 
-              {/* Password */}
+              {/* Password Input */}
               <div>
                 <label className="block text-sm font-medium text-gray-900 mb-2">
                   Password
@@ -259,7 +257,7 @@ function RegisterPage() {
                 </div>
               </div>
 
-              {/* Confirm Password */}
+              {/* Confirm Password Input */}
               <div>
                 <label className="block text-sm font-medium text-gray-900 mb-2">
                   Confirm Password
@@ -330,19 +328,7 @@ function RegisterPage() {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between">
-                <label className="inline-flex items-center gap-2 text-sm text-gray-700">
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  Remember me
-                </label>
-                <span className="text-sm text-blue-500">
-                  Forgot Password?
-                </span>
-              </div>
-
+              {/* Submit Action */}
               <button
                 type="submit"
                 disabled={isLoading}
@@ -352,6 +338,7 @@ function RegisterPage() {
               </button>
             </form>
 
+            {/* Alternative Providers Divider */}
             <div className="my-6 flex items-center gap-3">
               <div className="h-px flex-1 bg-gray-200" />
               <span className="text-xs text-gray-500 uppercase">OR</span>

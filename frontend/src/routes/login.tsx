@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { SiteLayout } from "@/components/SiteLayout";
 import { useState } from "react";
-import { Mail, Lock } from "lucide-react";
+import { Mail, Lock, Eye, EyeOff } from "lucide-react";
 
 export const Route = createFileRoute("/login")({
   head: () => ({
@@ -19,6 +19,7 @@ function LoginPage() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -64,14 +65,13 @@ function LoginPage() {
 
   return (
     <SiteLayout>
-      <section className="mx-auto grid min-h-[calc(100vh-4rem)] max-w-6xl gap-0 px-0 pt-30 md:grid-cols-2">
-        <div className="flex flex-col justify-center bg-[#f4f6ff] px-6 py-12 pt-100 sm:px-12">
-          <div className="mb-20">
-            <div className="absolute top-50 left-25">
-              <img src="/images/logo.svg" alt="TruthLens" className="h-10 w-auto" />
-            </div>
+      <section className="mx-auto grid min-h-[calc(100vh-4rem)] max-w-6xl gap-0 px-0 pt-16 md:grid-cols-2">
+        {/* Left Panel */}
+        <div className="flex flex-col justify-start bg-[#f4f6ff] px-6 pt-24 pb-12 sm:px-12 relative">
+          <div className="absolute top-8 left-6 sm:left-12">
+            <img src="/images/logo.svg" alt="TruthLens" className="h-10 w-auto" />
           </div>
-          <h1 className="text-3xl font-bold sm:text-4xl">
+          <h1 className="text-3xl font-bold sm:text-4xl mt-12">
             Welcome back to
             <br />
             <span className="text-primary">TruthLens.</span>
@@ -81,6 +81,7 @@ function LoginPage() {
           </p>
         </div>
 
+        {/* Right Panel - Interactive Form */}
         <div className="flex flex-col justify-center px-6 py-12 sm:px-12">
           <div className="mx-auto w-full max-w-sm">
             <h2 className="text-2xl font-bold">Sign in</h2>
@@ -95,6 +96,7 @@ function LoginPage() {
             )}
 
             <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+              {/* Email Field */}
               <div>
                 <label className="text-xs font-medium text-foreground/80">
                   Email
@@ -104,7 +106,10 @@ function LoginPage() {
                   <input
                     type="email"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      if (error) setError("");
+                    }}
                     placeholder="Enter your email"
                     className="w-full rounded-md border border-input bg-background py-2 pl-10 pr-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
                     required
@@ -112,6 +117,7 @@ function LoginPage() {
                 </div>
               </div>
 
+              {/* Password Field */}
               <div>
                 <label className="text-xs font-medium text-foreground/80">
                   Password
@@ -119,21 +125,31 @@ function LoginPage() {
                 <div className="relative mt-1">
                   <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <input
-                    type="password"
+                    type={showPassword ? "text" : "password"}
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      if (error) setError("");
+                    }}
                     placeholder="Enter your password"
-                    className="w-full rounded-md border border-input bg-background py-2 pl-10 pr-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                    className="w-full rounded-md border border-input bg-background py-2 pl-10 pr-10 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
                     required
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
                 </div>
               </div>
 
+              {/* Extras */}
               <div className="flex items-center justify-between text-xs">
                 <label className="inline-flex items-center gap-2 text-muted-foreground">
                   <input type="checkbox" className="rounded border-input" /> Remember me
                 </label>
-                {/* Forgot Password - placeholder, does nothing for now */}
                 <button
                   type="button"
                   onClick={(e) => e.preventDefault()}
@@ -143,6 +159,7 @@ function LoginPage() {
                 </button>
               </div>
 
+              {/* Submit Button */}
               <button
                 type="submit"
                 disabled={isLoading}

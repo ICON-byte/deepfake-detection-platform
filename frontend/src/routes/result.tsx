@@ -1,11 +1,11 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useEffect } from "react";
 import {
   CheckCircle2,
   XCircle,
   AlertTriangle,
   RotateCcw,
   Download,
-  Share2,
   BarChart3,
   Clock,
   FileImage,
@@ -17,6 +17,27 @@ import {
   Zap,
 } from "lucide-react";
 import { SiteLayout } from "@/components/SiteLayout";
+
+// Define TypeScript interfaces for type-safe parameter processing
+interface DeepfakeData {
+  isDeepfake: boolean;
+  confidence: number;
+  details: string;
+}
+
+interface AIData {
+  isAIGenerated: boolean;
+  confidence: number;
+  details: string;
+}
+
+interface PhishingData {
+  isMalicious: boolean;
+  confidence: number;
+  details: string;
+  riskLevel: "low" | "high";
+  url?: string;
+}
 
 export const Route = createFileRoute("/result")({
   component: ResultPage,
@@ -33,6 +54,13 @@ export const Route = createFileRoute("/result")({
 function ResultPage() {
   const { type, data, fileName, timestamp } = Route.useSearch();
   const navigate = useNavigate();
+
+  // If search parameters are corrupted or type is missing, fallback to dashboard
+  useEffect(() => {
+    if (!type || !data) {
+      navigate({ to: "/detect" });
+    }
+  }, [type, data, navigate]);
 
   const handleNewAnalysis = () => {
     navigate({ to: "/detect" });
@@ -60,11 +88,12 @@ function ResultPage() {
     return new Date().toLocaleString();
   };
 
+  if (!type || !data) return null;
+
+  // 1. DEEPFAKE ANALYSIS CARD
   if (type === "deepfake") {
-    const { isDeepfake, confidence, details } = data;
+    const { isDeepfake, confidence, details } = data as DeepfakeData;
     const confidencePercent = (confidence * 100).toFixed(1);
-    const verdictColor = isDeepfake ? "red" : "green";
-    const verdictBg = isDeepfake ? "bg-red-50 border-red-200" : "bg-green-50 border-green-200";
     const scoreColor = isDeepfake ? "text-red-600" : "text-green-600";
 
     const artifactScore = isDeepfake ? 87 : 23;
@@ -74,20 +103,17 @@ function ResultPage() {
     return (
       <SiteLayout>
         <div className="mx-auto max-w-5xl px-4 py-12 mt-24 mb-20">
-          {/* Main Header Card */}
           <div className="rounded-3xl bg-white border border-slate-200 shadow-lg overflow-hidden mb-8">
             <div className="px-8 py-10 border-b border-slate-200 bg-white">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                  {isDeepfake ? (
-                    <div className="p-2.5 bg-slate-100 rounded-2xl">
+                  <div className="p-2.5 bg-slate-100 rounded-2xl">
+                    {isDeepfake ? (
                       <XCircle className="h-8 w-8 text-[#6699ff]" />
-                    </div>
-                  ) : (
-                    <div className="p-2.5 bg-slate-100 rounded-2xl">
+                    ) : (
                       <CheckCircle2 className="h-8 w-8 text-[#6699ff]" />
-                    </div>
-                  )}
+                    )}
+                  </div>
                   <div>
                     <h1 className="text-4xl font-bold text-slate-900">
                       {isDeepfake ? "Deepfake Detected" : "Authentic Media"}
@@ -100,13 +126,13 @@ function ResultPage() {
                 <div className="flex gap-3 flex-wrap justify-end">
                   <button
                     onClick={handleDownloadReport}
-                    className="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-400 transition-all shadow-sm"
+                    className="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-400 transition-all shadow-sm cursor-pointer"
                   >
                     <Download className="h-4 w-4" /> Report
                   </button>
                   <button
                     onClick={handleNewAnalysis}
-                    className="inline-flex items-center gap-2 rounded-full bg-[#6699ff] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[#5588ee] transition-all shadow-md hover:shadow-lg"
+                    className="inline-flex items-center gap-2 rounded-full bg-[#6699ff] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[#5588ee] transition-all shadow-md hover:shadow-lg cursor-pointer"
                   >
                     <RotateCcw className="h-4 w-4" /> New Analysis
                   </button>
@@ -115,7 +141,6 @@ function ResultPage() {
             </div>
 
             <div className="px-8 py-8 space-y-8">
-              {/* Confidence Score Section */}
               <div className="bg-slate-50 rounded-2xl p-6 border border-slate-200">
                 <div className="flex justify-between items-end mb-4">
                   <div>
@@ -139,7 +164,6 @@ function ResultPage() {
                 <p className="text-sm text-slate-600 leading-relaxed">{details}</p>
               </div>
 
-              {/* Analysis Metrics */}
               <div>
                 <h2 className="text-lg font-bold text-slate-900 mb-4">Analysis Breakdown</h2>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -148,9 +172,7 @@ function ResultPage() {
                       <div className="p-2 bg-slate-100 rounded-lg">
                         <Shield className="h-5 w-5 text-[#6699ff]" />
                       </div>
-                      <span className={`text-2xl font-bold ${
-                        artifactScore > 70 ? "text-red-600" : "text-green-600"
-                      }`}>{artifactScore}%</span>
+                      <span className={`text-2xl font-bold ${artifactScore > 70 ? "text-red-600" : "text-green-600"}`}>{artifactScore}%</span>
                     </div>
                     <p className="text-sm font-semibold text-slate-900 mb-1">Artifact Scan</p>
                     <p className="text-xs text-slate-600">GAN artifacts & noise patterns</p>
@@ -160,9 +182,7 @@ function ResultPage() {
                       <div className="p-2 bg-slate-100 rounded-lg">
                         <Brain className="h-5 w-5 text-[#6699ff]" />
                       </div>
-                      <span className={`text-2xl font-bold ${
-                        faceConsistency > 70 ? "text-green-600" : "text-red-600"
-                      }`}>{faceConsistency}%</span>
+                      <span className={`text-2xl font-bold ${faceConsistency > 70 ? "text-green-600" : "text-red-600"}`}>{faceConsistency}%</span>
                     </div>
                     <p className="text-sm font-semibold text-slate-900 mb-1">Facial Consistency</p>
                     <p className="text-xs text-slate-600">Landmark alignment & symmetry</p>
@@ -172,9 +192,7 @@ function ResultPage() {
                       <div className="p-2 bg-slate-100 rounded-lg">
                         <Target className="h-5 w-5 text-[#6699ff]" />
                       </div>
-                      <span className={`text-2xl font-bold ${
-                        lightingAnalysis > 70 ? "text-green-600" : "text-red-600"
-                      }`}>{lightingAnalysis}%</span>
+                      <span className={`text-2xl font-bold ${lightingAnalysis > 70 ? "text-green-600" : "text-red-600"}`}>{lightingAnalysis}%</span>
                     </div>
                     <p className="text-sm font-semibold text-slate-900 mb-1">Lighting Analysis</p>
                     <p className="text-xs text-slate-600">Shadow & illumination consistency</p>
@@ -182,7 +200,6 @@ function ResultPage() {
                 </div>
               </div>
 
-              {/* AI Explanation Card */}
               <div className="rounded-2xl border border-slate-200 bg-white p-6">
                 <div className="flex items-center gap-2 mb-4">
                   <Zap className="h-5 w-5 text-[#6699ff]" />
@@ -195,7 +212,6 @@ function ResultPage() {
                 </p>
               </div>
 
-              {/* Recommendation Box */}
               <div className="rounded-2xl p-6 border border-slate-200 bg-slate-50">
                 <p className="text-sm font-medium leading-relaxed text-slate-900">
                   <strong>Recommendation:</strong> {isDeepfake
@@ -204,7 +220,6 @@ function ResultPage() {
                 </p>
               </div>
 
-              {/* File Info Footer */}
               {fileName && (
                 <div className="flex flex-wrap items-center gap-4 text-sm text-slate-600 border-t border-slate-200 pt-6 mt-6">
                   <div className="flex items-center gap-2">
@@ -224,10 +239,10 @@ function ResultPage() {
     );
   }
 
+  // 2. LINGUISTIC TEXT / AI ANALYSIS CARD
   if (type === "ai") {
-    const { isAIGenerated, confidence, details } = data;
+    const { isAIGenerated, confidence, details } = data as AIData;
     const confidencePercent = (confidence * 100).toFixed(1);
-    const verdictBg = isAIGenerated ? "bg-amber-50 border-amber-200" : "bg-green-50 border-green-200";
     const scoreColor = isAIGenerated ? "text-amber-600" : "text-green-600";
 
     const perplexity = isAIGenerated ? 24 : 78;
@@ -237,25 +252,20 @@ function ResultPage() {
     return (
       <SiteLayout>
         <div className="mx-auto max-w-5xl px-4 py-12 mt-24 mb-20">
-          {/* Main Header Card */}
           <div className="rounded-3xl bg-white border border-slate-200 shadow-lg overflow-hidden mb-8">
             <div className="px-8 py-10 border-b border-slate-200 bg-white">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                  {isAIGenerated ? (
-                    <div className="p-2.5 bg-slate-100 rounded-2xl">
+                  <div className="p-2.5 bg-slate-100 rounded-2xl">
+                    {isAIGenerated ? (
                       <AlertTriangle className="h-8 w-8 text-[#6699ff]" />
-                    </div>
-                  ) : (
-                    <div className="p-2.5 bg-slate-100 rounded-2xl">
+                    ) : (
                       <CheckCircle2 className="h-8 w-8 text-[#6699ff]" />
-                    </div>
-                  )}
+                    )}
+                  </div>
                   <div>
                     <h1 className="text-4xl font-bold text-slate-900">
-                      {isAIGenerated
-                        ? "AI-Generated Content Detected"
-                        : "Likely Human-Written / Authentic"}
+                      {isAIGenerated ? "AI-Generated Content Detected" : "Likely Human-Written / Authentic"}
                     </h1>
                     <p className="text-sm text-slate-600 mt-2">
                       Analysis completed at {formatTimestamp()}
@@ -265,13 +275,13 @@ function ResultPage() {
                 <div className="flex gap-3 flex-wrap justify-end">
                   <button
                     onClick={handleDownloadReport}
-                    className="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-400 transition-all shadow-sm"
+                    className="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-400 transition-all shadow-sm cursor-pointer"
                   >
                     <Download className="h-4 w-4" /> Report
                   </button>
                   <button
                     onClick={handleNewAnalysis}
-                    className="inline-flex items-center gap-2 rounded-full bg-[#6699ff] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[#5588ee] transition-all shadow-md hover:shadow-lg"
+                    className="inline-flex items-center gap-2 rounded-full bg-[#6699ff] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[#5588ee] transition-all shadow-md hover:shadow-lg cursor-pointer"
                   >
                     <RotateCcw className="h-4 w-4" /> New Analysis
                   </button>
@@ -280,7 +290,6 @@ function ResultPage() {
             </div>
 
             <div className="px-8 py-8 space-y-8">
-              {/* Confidence Score Section */}
               <div className="bg-slate-50 rounded-2xl p-6 border border-slate-200">
                 <div className="flex justify-between items-end mb-4">
                   <div>
@@ -304,7 +313,6 @@ function ResultPage() {
                 <p className="text-sm text-slate-600 leading-relaxed">{details}</p>
               </div>
 
-              {/* Analysis Metrics */}
               <div>
                 <h2 className="text-lg font-bold text-slate-900 mb-4">Linguistic Analysis</h2>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -342,7 +350,7 @@ function ResultPage() {
               </div>
 
               <div className="flex flex-col md:flex-row items-stretch justify-center gap-6">
-                <div className="w-full md:w-1/2 rounded-2xl border border-slate-200 bg-white p-6 h-full min-h-[160px]">
+                <div className="w-full md:w-1/2 rounded-2xl border border-slate-200 bg-white p-6 min-h-[160px]">
                   <div className="flex items-center gap-2 mb-4">
                     <Zap className="h-5 w-5 text-[#6699ff]" />
                     <h3 className="text-base font-bold text-slate-900">Analysis Explanation</h3>
@@ -354,7 +362,7 @@ function ResultPage() {
                   </p>
                 </div>
 
-                <div className="w-full md:w-1/2 rounded-2xl p-6 border border-slate-200 bg-slate-50 h-lg min-h-[160px]">
+                <div className="w-full md:w-1/2 rounded-2xl p-6 border border-slate-200 bg-slate-50 min-h-[160px]">
                   <p className="text-sm font-medium leading-relaxed text-slate-900">
                     <strong>Recommendation:</strong> {isAIGenerated
                       ? " This content exhibits strong AI generation markers. Verify with original sources if critical for decision-making."
@@ -363,7 +371,6 @@ function ResultPage() {
                 </div>
               </div>
 
-              {/* File Info Footer */}
               {fileName && (
                 <div className="flex flex-wrap items-center gap-4 text-sm text-slate-600 border-t border-slate-200 pt-6 mt-6">
                   <div className="flex items-center gap-2">
@@ -383,14 +390,10 @@ function ResultPage() {
     );
   }
 
+  // 3. PHISHING NETWORK / URL ANALYSIS CARD
   if (type === "phishing") {
-    const { isMalicious, confidence, details, riskLevel } = data;
+    const { isMalicious, confidence, details, riskLevel, url } = data as PhishingData;
     const confidencePercent = (confidence * 100).toFixed(1);
-    const verdictBg = isMalicious
-      ? riskLevel === "high"
-        ? "bg-red-50 border-red-200"
-        : "bg-amber-50 border-amber-200"
-      : "bg-green-50 border-green-200";
 
     const domainAge = isMalicious ? "< 30 days" : "> 2 years";
     const sslValid = isMalicious ? "Self-signed" : "Valid (Let's Encrypt)";
@@ -400,25 +403,20 @@ function ResultPage() {
     return (
       <SiteLayout>
         <div className="mx-auto max-w-5xl px-4 py-12 mt-24 mb-20">
-          {/* Main Header Card */}
           <div className="rounded-3xl bg-white border border-slate-200 shadow-lg overflow-hidden mb-8">
             <div className="px-8 py-10 border-b border-slate-200 bg-white">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                  {isMalicious ? (
-                    <div className="p-2.5 bg-slate-100 rounded-2xl">
+                  <div className="p-2.5 bg-slate-100 rounded-2xl">
+                    {isMalicious ? (
                       <XCircle className="h-8 w-8 text-[#6699ff]" />
-                    </div>
-                  ) : (
-                    <div className="p-2.5 bg-slate-100 rounded-2xl">
+                    ) : (
                       <CheckCircle2 className="h-8 w-8 text-[#6699ff]" />
-                    </div>
-                  )}
+                    )}
+                  </div>
                   <div>
                     <h1 className="text-4xl font-bold text-slate-900">
-                      {isMalicious
-                        ? "Suspicious / Malicious URL Detected"
-                        : "URL Appears Safe"}
+                      {isMalicious ? "Suspicious / Malicious URL Detected" : "URL Appears Safe"}
                     </h1>
                     <p className="text-sm text-slate-600 mt-2">
                       Analysis completed at {formatTimestamp()}
@@ -428,13 +426,13 @@ function ResultPage() {
                 <div className="flex gap-3 flex-wrap justify-end">
                   <button
                     onClick={handleDownloadReport}
-                    className="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-400 transition-all shadow-sm"
+                    className="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-400 transition-all shadow-sm cursor-pointer"
                   >
                     <Download className="h-4 w-4" /> Report
                   </button>
                   <button
                     onClick={handleNewAnalysis}
-                    className="inline-flex items-center gap-2 rounded-full bg-[#6699ff] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[#5588ee] transition-all shadow-md hover:shadow-lg"
+                    className="inline-flex items-center gap-2 rounded-full bg-[#6699ff] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[#5588ee] transition-all shadow-md hover:shadow-lg cursor-pointer"
                   >
                     <RotateCcw className="h-4 w-4" /> New Analysis
                   </button>
@@ -443,14 +441,11 @@ function ResultPage() {
             </div>
 
             <div className="px-8 py-8 space-y-8">
-              {/* Confidence Score Section */}
               <div className="bg-slate-50 rounded-2xl p-6 border border-slate-200">
                 <div className="flex justify-between items-end mb-4">
                   <div>
                     <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Security Confidence</p>
-                    <p className={`text-5xl font-bold ${
-                      isMalicious ? (riskLevel === "high" ? "text-red-600" : "text-amber-600") : "text-green-600"
-                    }`}>
+                    <p className={`text-5xl font-bold ${isMalicious ? (riskLevel === "high" ? "text-red-600" : "text-amber-600") : "text-green-600"}`}>
                       {confidencePercent}%
                     </p>
                   </div>
@@ -469,7 +464,6 @@ function ResultPage() {
                 <p className="text-sm text-slate-600 leading-relaxed">{details}</p>
               </div>
 
-              {/* Security Metrics */}
               <div>
                 <h2 className="text-lg font-bold text-slate-900 mb-4">Security Analysis</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -478,9 +472,7 @@ function ResultPage() {
                       <div className="p-2 bg-slate-100 rounded-lg">
                         <Clock className="h-5 w-5 text-[#6699ff]" />
                       </div>
-                      <span className={`text-lg font-bold ${
-                        isMalicious ? "text-red-600" : "text-green-600"
-                      }`}>{domainAge}</span>
+                      <span className={`text-lg font-bold ${isMalicious ? "text-red-600" : "text-green-600"}`}>{domainAge}</span>
                     </div>
                     <p className="text-sm font-semibold text-slate-900 mb-1">Domain Age</p>
                     <p className="text-xs text-slate-600">Newer domains are higher risk</p>
@@ -490,9 +482,7 @@ function ResultPage() {
                       <div className="p-2 bg-slate-100 rounded-lg">
                         <Shield className="h-5 w-5 text-[#6699ff]" />
                       </div>
-                      <span className={`text-lg font-bold ${
-                        sslValid.includes("Self") ? "text-red-600" : "text-green-600"
-                      }`}>{sslValid.split(" ")[0]}</span>
+                      <span className={`text-lg font-bold ${sslValid.includes("Self") ? "text-red-600" : "text-green-600"}`}>{sslValid.split(" ")[0]}</span>
                     </div>
                     <p className="text-sm font-semibold text-slate-900 mb-1">SSL Certificate</p>
                     <p className="text-xs text-slate-600">Validity & issuer check</p>
@@ -502,9 +492,7 @@ function ResultPage() {
                       <div className="p-2 bg-slate-100 rounded-lg">
                         <Link2 className="h-5 w-5 text-[#6699ff]" />
                       </div>
-                      <span className={`text-lg font-bold ${
-                        redirects > 0 ? "text-red-600" : "text-green-600"
-                      }`}>{redirects}</span>
+                      <span className={`text-lg font-bold ${redirects > 0 ? "text-red-600" : "text-green-600"}`}>{redirects}</span>
                     </div>
                     <p className="text-sm font-semibold text-slate-900 mb-1">Redirects</p>
                     <p className="text-xs text-slate-600">Number of redirect chains</p>
@@ -514,9 +502,7 @@ function ResultPage() {
                       <div className="p-2 bg-slate-100 rounded-lg">
                         <AlertTriangle className="h-5 w-5 text-[#6699ff]" />
                       </div>
-                      <span className={`text-lg font-bold ${
-                        blacklistCount > 0 ? "text-red-600" : "text-green-600"
-                      }`}>{blacklistCount}</span>
+                      <span className={`text-lg font-bold ${blacklistCount > 0 ? "text-red-600" : "text-green-600"}`}>{blacklistCount}</span>
                     </div>
                     <p className="text-sm font-semibold text-slate-900 mb-1">Blacklist Hits</p>
                     <p className="text-xs text-slate-600">Known threat databases</p>
@@ -524,7 +510,6 @@ function ResultPage() {
                 </div>
               </div>
 
-              {/* AI Explanation Card */}
               <div className="rounded-2xl border border-slate-200 bg-white p-6">
                 <div className="flex items-center gap-2 mb-4">
                   <Zap className="h-5 w-5 text-[#6699ff]" />
@@ -539,7 +524,6 @@ function ResultPage() {
                 </p>
               </div>
 
-              {/* Recommendation Box */}
               <div className="rounded-2xl p-6 border border-slate-200 bg-slate-50">
                 <p className="text-sm font-medium leading-relaxed text-slate-900">
                   <strong>Recommendation:</strong> {
@@ -552,11 +536,10 @@ function ResultPage() {
                 </p>
               </div>
 
-              {/* URL Info Footer */}
               <div className="flex flex-wrap items-center gap-4 text-sm text-slate-600 border-t border-slate-200 pt-6 mt-6">
                 <div className="flex items-center gap-2 flex-wrap">
                   <Link2 className="h-4 w-4 text-[#6699ff] flex-shrink-0" />
-                  <span className="break-all"><strong>URL:</strong> {data.url || "Not saved"}</span>
+                  <span className="break-all"><strong>URL:</strong> {url || "Not saved"}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Clock className="h-4 w-4 text-[#6699ff] flex-shrink-0" />

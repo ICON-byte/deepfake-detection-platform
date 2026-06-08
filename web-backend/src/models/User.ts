@@ -5,7 +5,6 @@ export interface IUser extends Document {
   fullName: string;
   email: string;
   password: string;
-  tier: 'free' | 'pro' | 'premium' | 'enterprise'; // 4 tiers
   createdAt: Date;
 }
 
@@ -27,11 +26,6 @@ const UserSchema: Schema = new Schema(
     password: { 
       type: String, 
       required: [true, 'Password is required'] 
-    },
-    tier: { 
-      type: String, 
-      enum: ['free', 'pro', 'premium', 'enterprise'], // 4 tiers 
-      default: 'free' 
     }
   },
   {

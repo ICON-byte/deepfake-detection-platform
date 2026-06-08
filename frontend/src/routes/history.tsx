@@ -1,7 +1,7 @@
-  import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { SiteLayout } from "@/components/SiteLayout";
 import {
-  History,
+  History as HistoryIcon,
   CalendarDays,
   FileText,
   Video,
@@ -15,13 +15,28 @@ import {
   Trash2,
   RotateCcw,
   Search,
-  Filter,
   UploadCloud,
   ChevronRight,
   AlertCircle,
+  Volume2
 } from "lucide-react";
-import { useState } from "react";
+import React, { useState } from "react";
 
+type DetectionType = "deepfake" | "aigen" | "phishing";
+type ResultStatus = "real" | "manipulated" | "suspicious" | "phishing";
+
+interface HistoryItem {
+  id: string;
+  type: DetectionType;
+  mediaName: string;
+  date: string; // ISO string from MongoDB
+  status: ResultStatus;
+  confidence: number; 
+  details: string;
+  thumbnail?: string; 
+}
+
+// 1. Define the Route with a loader to fetch data from MongoDB via your API gateway
 export const Route = createFileRoute("/history")({
   head: () => ({
     meta: [
@@ -37,95 +52,67 @@ export const Route = createFileRoute("/history")({
       },
     ],
   }),
+  loader: async (): Promise<HistoryItem[]> => {
+    try {
+      // Pointing directly to your clean history API entrypoint
+      const response = await fetch("/api/history");
+      if (!response.ok) {
+        throw new Error("Failed to fetch history from database");
+      }
+      return await response.json();
+    } catch (error) {
+      console.error("Database connection error:", error);
+      return []; // Return empty fallback array on error
+    }
+  },
   component: HistoryPage,
 });
 
-type DetectionType = "deepfake" | "aigen" | "phishing";
-type ResultStatus = "real" | "manipulated" | "suspicious" | "phishing";
-
-interface HistoryItem {
-  id: string;
-  type: DetectionType;
-  mediaName: string;
-  date: Date;
-  status: ResultStatus;
-  confidence: number; // 0-100
-  details: string;
-  thumbnail?: string; // not used in mock but for future
-}
-
-// Mock data for demonstration
-const initialHistoryItems: HistoryItem[] = [
-  {
-    id: "1",
-    type: "deepfake",
-    mediaName: "presidential_speech.mp4",
-    date: new Date(2025, 1, 15, 14, 32),
-    status: "manipulated",
-    confidence: 96,
-    details: "Multiple facial inconsistencies detected. Temporal flickering in mouth movements.",
-  },
-  {
-    id: "2",
-    type: "aigen",
-    mediaName: "chatbot_article_generated.txt",
-    date: new Date(2025, 1, 14, 9, 17),
-    status: "manipulated",
-    confidence: 87,
-    details: "High probability of GPT-generated content. Unusual perplexity patterns.",
-  },
-  {
-    id: "3",
-    type: "phishing",
-    mediaName: "secure-login-page.com",
-    date: new Date(2025, 1, 14, 22, 5),
-    status: "phishing",
-    confidence: 94,
-    details: "Domain impersonation detected. SSL certificate mismatch.",
-  },
-  {
-    id: "4",
-    type: "deepfake",
-    mediaName: "celebrity_interview.mp4",
-    date: new Date(2025, 1, 13, 11, 42),
-    status: "real",
-    confidence: 23,
-    details: "No manipulation artifacts detected. Confidence in authenticity.",
-  },
-  {
-    id: "5",
-    type: "aigen",
-    mediaName: "ai_generated_landscape.png",
-    date: new Date(2025, 1, 12, 16, 20),
-    status: "suspicious",
-    confidence: 68,
-    details: "Inconsistent lighting and texture patterns. Possible GAN artifacts.",
-  },
-  {
-    id: "6",
-    type: "phishing",
-    mediaName: "paypal-verify-security.com",
-    date: new Date(2025, 1, 11, 8, 55),
-    status: "phishing",
-    confidence: 98,
-    details: "Confirmed phishing domain. Blacklisted by 12 security vendors.",
-  },
-];
-
 function HistoryPage() {
-  const [historyItems, setHistoryItems] = useState<HistoryItem[]>(initialHistoryItems);
+  // 2. Consume the synchronized server-side data from TanStack router loader
+  const initialData = Route.useLoaderData();
+  const router = useRouter();
+
+  const [historyItems, setHistoryItems] = useState<HistoryItem[]>(initialData);
   const [filterType, setFilterType] = useState<DetectionType | "all">("all");
   const [searchQuery, setSearchQuery] = useState("");
 
-  const handleDelete = (id: string) => {
+  // 3. Sync deletions back to the MongoDB collections via API
+  const handleDelete = async (id: string) => {
     if (window.confirm("Are you sure you want to delete this analysis from history?")) {
-      setHistoryItems((prev) => prev.filter((item) => item.id !== id));
+      try {
+        const response = await fetch(`/api/history/${id}`, {
+          method: "DELETE",
+        });
+
+        if (response.ok) {
+          setHistoryItems((prev) => prev.filter((item) => item.id !== id));
+          router.invalidate(); // Tell router to refresh data cache
+        } else {
+          alert("Failed to delete the record from database.");
+        }
+      } catch (err) {
+        console.error("Error communicating with server:", err);
+      }
     }
   };
 
-  const handleClearAll = () => {
-    if (window.confirm("Permanently delete all analysis history? This action cannot be undone.")) {
-      setHistoryItems([]);
+  const handleClearAll = async () => {
+    if (window.confirm("Permanently delete all analysis history from the database? This action cannot be undone.")) {
+      try {
+        const response = await fetch("/api/history/clear", {
+          method: "DELETE",
+        });
+
+        if (response.ok) {
+          setHistoryItems([]);
+          router.invalidate();
+        } else {
+          alert("Failed to clear database logs.");
+        }
+      } catch (err) {
+        console.error("Error communicating with server:", err);
+      }
     }
   };
 
@@ -135,10 +122,20 @@ function HistoryPage() {
     return matchesType && matchesSearch;
   });
 
-  const getTypeIcon = (type: DetectionType) => {
+  const getTypeIcon = (type: DetectionType, filename: string) => {
+    const ext = filename.split(".").pop()?.toLowerCase();
+    
+    if (type === "deepfake") {
+      if (ext && ["mp3", "wav", "m4a", "ogg", "flac"].includes(ext)) {
+        return <Volume2 className="h-4 w-4" />;
+      }
+      if (ext && ["png", "jpg", "jpeg", "webp"].includes(ext)) {
+        return <ImageIcon className="h-4 w-4" />;
+      }
+      return <Video className="h-4 w-4" />;
+    }
+    
     switch (type) {
-      case "deepfake":
-        return <Video className="h-4 w-4" />;
       case "aigen":
         return <Sparkles className="h-4 w-4" />;
       case "phishing":
@@ -181,11 +178,11 @@ function HistoryPage() {
     return "text-green-600 dark:text-green-400";
   };
 
-  const formatDate = (date: Date) => {
+  const formatDate = (dateStr: string) => {
     return new Intl.DateTimeFormat("en-US", {
       dateStyle: "medium",
       timeStyle: "short",
-    }).format(date);
+    }).format(new Date(dateStr));
   };
 
   return (
@@ -194,7 +191,7 @@ function HistoryPage() {
         {/* Header */}
         <div className="text-center">
           <span className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-xs font-medium text-primary">
-            <History className="h-3 w-3" /> Complete analysis archive
+            <HistoryIcon className="h-3 w-3" /> Complete analysis archive
           </span>
           <h1 className="mt-5 text-3xl font-bold sm:text-4xl">
             Analysis <span className="bg-gradient-to-r from-[#B23200] to-[#251FBA] bg-clip-text text-transparent">History</span>
@@ -206,24 +203,14 @@ function HistoryPage() {
 
         {/* Filters and actions */}
         <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          {/* Filter tabs */}
           <div className="flex flex-wrap gap-2 rounded-full border border-border/70 bg-card p-1">
-            <FilterBtn active={filterType === "all"} onClick={() => setFilterType("all")}>
-              All
-            </FilterBtn>
-            <FilterBtn active={filterType === "deepfake"} onClick={() => setFilterType("deepfake")}>
-              Deepfake
-            </FilterBtn>
-            <FilterBtn active={filterType === "aigen"} onClick={() => setFilterType("aigen")}>
-              AI Content
-            </FilterBtn>
-            <FilterBtn active={filterType === "phishing"} onClick={() => setFilterType("phishing")}>
-              Phishing
-            </FilterBtn>
+            <FilterBtn active={filterType === "all"} onClick={() => setFilterType("all")}>All</FilterBtn>
+            <FilterBtn active={filterType === "deepfake"} onClick={() => setFilterType("deepfake")}>Deepfake</FilterBtn>
+            <FilterBtn active={filterType === "aigen"} onClick={() => setFilterType("aigen")}>AI Content</FilterBtn>
+            <FilterBtn active={filterType === "phishing"} onClick={() => setFilterType("phishing")}>Phishing</FilterBtn>
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Search */}
             <div className="relative">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <input
@@ -235,7 +222,6 @@ function HistoryPage() {
               />
             </div>
 
-            {/* Clear all button */}
             {historyItems.length > 0 && (
               <button
                 onClick={handleClearAll}
@@ -251,7 +237,7 @@ function HistoryPage() {
         {filteredItems.length === 0 ? (
           <div className="mt-12 flex flex-col items-center justify-center rounded-2xl border border-border/70 bg-card py-16 text-center">
             <div className="rounded-full bg-primary/10 p-3">
-              <History className="h-8 w-8 text-primary" />
+              <HistoryIcon className="h-8 w-8 text-primary" />
             </div>
             <h3 className="mt-4 text-lg font-semibold">No analysis history found</h3>
             <p className="mt-1 text-sm text-muted-foreground">
@@ -271,70 +257,68 @@ function HistoryPage() {
             {filteredItems.map((item) => (
               <div
                 key={item.id}
-                className="group rounded-2xl border border-border/70 bg-card p-5 transition hover:border-primary/40 hover:shadow-sm"
+                className="group flex flex-col justify-between rounded-2xl border border-border/70 bg-card p-5 transition hover:border-primary/40 hover:shadow-sm"
               >
-                {/* Header with type and status */}
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className="rounded-lg bg-primary/10 p-1.5 text-primary">
-                      {getTypeIcon(item.type)}
+                <div>
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="rounded-lg bg-primary/10 p-1.5 text-primary">
+                        {getTypeIcon(item.type, item.mediaName)}
+                      </div>
+                      <span className="text-xs font-medium capitalize text-muted-foreground">
+                        {item.type === "aigen" ? "AI Content" : item.type}
+                      </span>
                     </div>
-                    <span className="text-xs font-medium capitalize text-muted-foreground">
-                      {item.type === "aigen" ? "AI Content" : item.type}
-                    </span>
+                    {getStatusBadge(item.status)}
                   </div>
-                  {getStatusBadge(item.status)}
+
+                  <div className="mt-3 flex items-start gap-2">
+                    <FileText className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                    <p className="break-all text-sm font-medium">{item.mediaName}</p>
+                  </div>
+
+                  <p className="mt-2 line-clamp-2 text-xs text-muted-foreground">{item.details}</p>
                 </div>
 
-                {/* Media name */}
-                <div className="mt-3 flex items-start gap-2">
-                  <FileText className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                  <p className="break-all text-sm font-medium">{item.mediaName}</p>
-                </div>
-
-                {/* Date and confidence */}
-                <div className="mt-3 flex items-center justify-between border-t border-border/50 pt-3 text-xs">
-                  <div className="flex items-center gap-1 text-muted-foreground">
-                    <CalendarDays className="h-3.5 w-3.5" />
-                    <span>{formatDate(item.date)}</span>
+                <div>
+                  <div className="mt-4 flex items-center justify-between border-t border-border/50 pt-3 text-xs">
+                    <div className="flex items-center gap-1 text-muted-foreground">
+                      <CalendarDays className="h-3.5 w-3.5" />
+                      <span>{formatDate(item.date)}</span>
+                    </div>
+                    <div className={`font-semibold ${getConfidenceColor(item.confidence)}`}>
+                      {item.confidence}% confidence
+                    </div>
                   </div>
-                  <div className={`font-semibold ${getConfidenceColor(item.confidence)}`}>
-                    {item.confidence}% confidence
+
+                  <div className="mt-4 flex items-center justify-end gap-2 border-t border-border/50 pt-3">
+                    <button
+                      onClick={() => {
+                        alert(`Full report for: ${item.mediaName}\n\nType: ${item.type}\nStatus: ${item.status}\nConfidence: ${item.confidence}%\nDetails: ${item.details}`);
+                      }}
+                      className="inline-flex items-center gap-1 rounded-full bg-secondary px-3 py-1.5 text-xs font-medium transition hover:bg-secondary/80"
+                    >
+                      <Eye className="h-3.5 w-3.5" /> View
+                    </button>
+                    <Link
+                      to="/detect"
+                      className="inline-flex items-center gap-1 rounded-full border border-border/70 bg-background px-3 py-1.5 text-xs font-medium transition hover:bg-secondary"
+                    >
+                      <RotateCcw className="h-3.5 w-3.5" /> Re-analyze
+                    </Link>
+                    <button
+                      onClick={() => handleDelete(item.id)}
+                      className="inline-flex items-center gap-1 rounded-full border border-border/70 bg-background px-3 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-50 dark:hover:bg-red-950/30"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" /> Delete
+                    </button>
                   </div>
-                </div>
-
-                {/* Details preview */}
-                <p className="mt-2 line-clamp-2 text-xs text-muted-foreground">{item.details}</p>
-
-                {/* Actions */}
-                <div className="mt-4 flex items-center justify-end gap-2 border-t border-border/50 pt-3">
-                  <button
-                    onClick={() => {
-                      alert(`Full report for: ${item.mediaName}\n\nType: ${item.type}\nStatus: ${item.status}\nConfidence: ${item.confidence}%\nDetails: ${item.details}`);
-                    }}
-                    className="inline-flex items-center gap-1 rounded-full bg-secondary px-3 py-1.5 text-xs font-medium transition hover:bg-secondary/80"
-                  >
-                    <Eye className="h-3.5 w-3.5" /> View
-                  </button>
-                  <Link
-                    to="/detect"
-                    className="inline-flex items-center gap-1 rounded-full border border-border/70 bg-background px-3 py-1.5 text-xs font-medium transition hover:bg-secondary"
-                  >
-                    <RotateCcw className="h-3.5 w-3.5" /> Re-analyze
-                  </Link>
-                  <button
-                    onClick={() => handleDelete(item.id)}
-                    className="inline-flex items-center gap-1 rounded-full border border-border/70 bg-background px-3 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-50 dark:hover:bg-red-950/30"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" /> Delete
-                  </button>
                 </div>
               </div>
             ))}
           </div>
         )}
 
-        {/* Export / summary section (optional) */}
         {historyItems.length > 0 && (
           <div className="mt-8 flex flex-col items-center justify-between gap-4 rounded-2xl border border-border/70 bg-card p-4 sm:flex-row">
             <div className="text-sm text-muted-foreground">
@@ -366,6 +350,7 @@ function FilterBtn({
   return (
     <button
       onClick={onClick}
+      type="button"
       className={`rounded-full px-4 py-1.5 text-xs font-medium transition sm:text-sm ${
         active
           ? "bg-primary text-primary-foreground shadow-sm"

@@ -14,7 +14,6 @@ export function Navbar() {
   // Check authentication status by verifying the presence of a valid token
   const checkAuth = () => {
     const token = localStorage.getItem("truthlens_token");
-    // For now, just check if token exists. You can add token expiration logic later.
     setIsLoggedIn(!!token);
   };
 
@@ -27,7 +26,6 @@ export function Navbar() {
   }, []);
 
   const handleLogout = () => {
-    // Remove both token and user data
     localStorage.removeItem("truthlens_token");
     localStorage.removeItem("truthlens_user");
     setIsLoggedIn(false);
@@ -35,19 +33,18 @@ export function Navbar() {
     setOpen(false);
   };
 
-  // Navigation links based on authentication
-  const loggedOutNav = [
+  // 🟢 CLEANER DYNAMIC QUEUE ENGINE
+  // Base public links visible to both guests and users
+  const baseNav = [
     { to: "/", label: "Home" },
     { to: "/about", label: "About" },
     { to: "/detect", label: "Detect" },
-  ] as const;
+  ];
 
-  const loggedInNav = [
-    { to: "/detect", label: "Detect" },
-    { to: "/history", label: "History" },
-  ] as const;
-
-  const nav = isLoggedIn ? loggedInNav : loggedOutNav;
+  // Dynamically push History to the navbar array only if logged in
+  const nav = isLoggedIn 
+    ? [...baseNav, { to: "/history", label: "History" }] 
+    : baseNav;
 
   return (
     <header

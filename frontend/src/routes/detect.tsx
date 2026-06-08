@@ -1,4 +1,4 @@
-﻿import { createFileRoute, useNavigate } from "@tanstack/react-router";
+﻿import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { SiteLayout } from "@/components/SiteLayout";
 import {
   UploadCloud,
@@ -10,8 +10,14 @@ import {
   FileCode2,
   Link2,
   File,
+  X,
+  Lock,
 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
+import axios from "axios";
+
+// Target backend API base configuration
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 export const Route = createFileRoute("/detect")({
   head: () => ({
@@ -37,6 +43,36 @@ type Tab = "deepfake" | "ai" | "phishing";
 
 function DetectPage() {
   const [tab, setTab] = useState<Tab>("deepfake");
+  const [showLimitModal, setShowLimitModal] = useState(false);
+
+  // Helper hook to check authentication and manage session-based free local usage
+  const checkGuestLimitReached = (): boolean => {
+    const token = localStorage.getItem("truthlens_token");
+    if (token) return false; // Authenticated users have unlimited access
+
+    const currentScans = parseInt(sessionStorage.getItem("truthlens_guest_scans") || "0", 10);
+    if (currentScans >= 3) {
+      setShowLimitModal(true);
+      return true;
+    }
+    return false;
+  };
+
+  // Helper to increment scan counts for guests
+  const incrementGuestScanCount = () => {
+    const token = localStorage.getItem("truthlens_token");
+    if (!token) {
+      const currentScans = parseInt(sessionStorage.getItem("truthlens_guest_scans") || "0", 10);
+      sessionStorage.setItem("truthlens_guest_scans", (currentScans + 1).toString());
+    }
+  };
+
+  // Safe Header generator to attach bearer tokens automatically
+  const getAuthHeaders = () => {
+    const token = localStorage.getItem("truthlens_token");
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  };
+
   return (
     <SiteLayout>
       <section className="relative overflow-hidden bg-background">
@@ -71,12 +107,75 @@ function DetectPage() {
           </div>
 
           <div className="mt-8">
-            {tab === "deepfake" && <DeepfakePanel />}
-            {tab === "ai" && <AiPanel />}
-            {tab === "phishing" && <PhishingPanel />}
+            {tab === "deepfake" && (
+              <DeepfakePanel 
+                onCheckLimit={checkGuestLimitReached} 
+                onTrackScan={incrementGuestScanCount} 
+                headers={getAuthHeaders()}
+                onTriggerLimitModal={() => setShowLimitModal(true)}
+              />
+            )}
+            {tab === "ai" && (
+              <AiPanel 
+                onCheckLimit={checkGuestLimitReached} 
+                onTrackScan={incrementGuestScanCount} 
+                headers={getAuthHeaders()}
+                onTriggerLimitModal={() => setShowLimitModal(true)}
+              />
+            )}
+            {tab === "phishing" && (
+              <PhishingPanel 
+                onCheckLimit={checkGuestLimitReached} 
+                onTrackScan={incrementGuestScanCount} 
+                headers={getAuthHeaders()}
+                onTriggerLimitModal={() => setShowLimitModal(true)}
+              />
+            )}
           </div>
         </div>
       </section>
+
+      {/* 🛑 GUEST RATE LIMIT REACHED OVERLAY MODAL */}
+      {showLimitModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="relative w-full max-w-md rounded-2xl border border-gray-100 bg-white p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+            <button 
+              onClick={() => setShowLimitModal(false)}
+              className="absolute right-4 top-4 rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+              aria-label="Close modal"
+            >
+              <X className="h-5 w-5" />
+            </button>
+            
+            <div className="flex flex-col items-center text-center">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-50 text-red-500">
+                <Lock className="h-6 w-6" />
+              </div>
+              <h3 className="mt-4 text-xl font-bold text-gray-900">Scan Limit Reached</h3>
+              <p className="mt-2 text-sm text-gray-500">
+                You've used your 3 free anonymous scans! Protect your data, unlock full breakdown parameters, and maintain an audit history by creating an account.
+              </p>
+              
+              <div className="mt-6 flex w-full flex-col gap-2">
+                <Link
+                  to="/register"
+                  onClick={() => setShowLimitModal(false)}
+                  className="flex w-full items-center justify-center rounded-xl bg-[#6699ff] py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#6699ff]/90 transition-colors"
+                >
+                  Sign Up For Free
+                </Link>
+                <Link
+                  to="/login"
+                  onClick={() => setShowLimitModal(false)}
+                  className="flex w-full items-center justify-center rounded-xl border border-gray-200 bg-white py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  Log In
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </SiteLayout>
   );
 }
@@ -130,13 +229,20 @@ function PanelCard({ title, children, icon }: { title: string; children: React.R
   );
 }
 
-// ======================= DEEPFAKE PANEL =======================
-function DeepfakePanel() {
+interface PanelProps {
+  onCheckLimit: () => boolean;
+  onTrackScan: () => void;
+  headers: any;
+  onTriggerLimitModal: () => void;
+}
+
+// ======================= DEEPFAKE PANEL (PRODUCTION AWS PIPELINE) =======================
+function DeepfakePanel({ onCheckLimit, onTrackScan, headers, onTriggerLimitModal }: PanelProps) {
   const navigate = useNavigate();
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const [progress, setProgress] = useState(0);
   const [statusMessage, setStatusMessage] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -149,65 +255,97 @@ function DeepfakePanel() {
 
   const handleFileSelect = async (selectedFile: File | null) => {
     if (selectedFile && selectedFile.type.startsWith("image/")) {
-      setIsUploading(true);
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      if (onCheckLimit()) return;
       setFile(selectedFile);
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
       setPreviewUrl(URL.createObjectURL(selectedFile));
-      setIsUploading(false);
     } else if (selectedFile) {
       alert("Please select a valid image file (JPEG, PNG, WEBP)");
     }
   };
 
-  const resetAnalysis = () => {
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
-    setFile(null);
-    setPreviewUrl(null);
-    setProgress(0);
-    setStatusMessage("");
-    setIsAnalyzing(false);
-    if (fileInputRef.current) fileInputRef.current.value = "";
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    if (!isProcessing) setIsDragging(true);
   };
 
-  const simulateAnalysis = async () => {
+  const handleDragLeave = () => {
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    if (isProcessing) return;
+    const droppedFile = e.dataTransfer.files?.[0] || null;
+    handleFileSelect(droppedFile);
+  };
+
+  const executePipeline = async () => {
     if (!file) return;
-    setIsAnalyzing(true);
-    setProgress(0);
+    if (onCheckLimit()) return;
 
-    const steps = [
-      { progress: 10, message: "Loading media file..." },
-      { progress: 25, message: "Extracting facial landmarks..." },
-      { progress: 45, message: "Analyzing pixel anomalies & artifacts..." },
-      { progress: 65, message: "Running neural network detection..." },
-      { progress: 85, message: "Cross-referencing deepfake signatures..." },
-      { progress: 100, message: "Finalizing results..." },
-    ];
+    setIsProcessing(true);
+    setProgress(5);
+    setStatusMessage("Requesting secure upload verification signature...");
 
-    for (const step of steps) {
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      setProgress(step.progress);
-      setStatusMessage(step.message);
-    }
+    try {
+      // Phase 1: Call gateway to acquire AWS Presigned Upload Target
+      const presignResponse = await axios.post(
+        `${API_BASE_URL}/detection/request-upload`,
+        { fileName: file.name, fileType: file.type, mode: "image" },
+        { headers }
+      );
 
-    const mockConfidence = 0.72 + Math.random() * 0.25;
-    const isDeepfake = mockConfidence > 0.65;
-    setIsAnalyzing(false);
-    navigate({
-      to: "/result",
-      search: {
-        type: "deepfake",
-        data: {
-          isDeepfake,
-          confidence: mockConfidence,
-          details: isDeepfake
-            ? "Multiple manipulation traces detected including inconsistent lighting and warped facial features."
-            : "No significant deepfake patterns found. Image appears authentic.",
+      const { uploadUrl, s3Key, fileUrl } = presignResponse.data;
+
+      // Phase 2: Upload direct payload binary straight to the S3 bucket node
+      setStatusMessage("Uploading asset securely to AWS S3 storage vault...");
+      setProgress(25);
+
+      await axios.put(uploadUrl, file, {
+        headers: { "Content-Type": file.type },
+        onUploadProgress: (progressEvent) => {
+          if (progressEvent.total) {
+            const percentage = Math.round((progressEvent.loaded * 45) / progressEvent.total);
+            setProgress(25 + percentage);
+          }
         },
-        fileName: file.name,
-        timestamp: new Date().toISOString(),
-      },
-    });
+      });
+
+      // Phase 3: Submit asset mapping indexes down into Python architecture
+      setStatusMessage("Analyzing facial biometrics & pixel anomalies...");
+      setProgress(75);
+
+      const analysisResponse = await axios.post(
+        `${API_BASE_URL}/detection/analyze`,
+        { fileUrl, s3Key, fileName: file.name, detectionMode: "image" },
+        { headers }
+      );
+
+      setProgress(100);
+      onTrackScan();
+      setIsProcessing(false);
+
+      navigate({
+        to: "/result",
+        search: {
+          type: "deepfake",
+          data: analysisResponse.data.data,
+          fileName: file.name,
+          timestamp: new Date().toISOString(),
+        },
+      });
+    } catch (err: any) {
+      setIsProcessing(false);
+      setProgress(0);
+
+      if (err?.response?.status === 429) {
+        onTriggerLimitModal();
+      } else {
+        alert(err?.response?.data?.message || "An error hit the media storage pipeline.");
+      }
+    }
   };
 
   return (
@@ -218,15 +356,20 @@ function DeepfakePanel() {
 
       <div
         className={`mt-5 flex min-h-52 cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed transition-all ${
-          isAnalyzing
+          isProcessing
             ? "border-[#6699ff]/40 bg-[#6699ff]/5"
+            : isDragging
+            ? "border-[#6699ff] bg-[#6699ff]/20 scale-[0.99]"
             : file
             ? "border-[#6699ff]/70 bg-[#6699ff]/15"
             : "border-[#6699ff]/40 bg-[#6699ff]/10 hover:border-[#6699ff]/70 hover:bg-[#6699ff]/15"
         } px-4 py-8 text-center`}
-        onClick={() => !isAnalyzing && fileInputRef.current?.click()}
+        onClick={() => !isProcessing && fileInputRef.current?.click()}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
       >
-        {isAnalyzing ? (
+        {isProcessing ? (
           <div className="flex flex-col items-center gap-3">
             <Loader2 className="h-10 w-10 animate-spin text-[#6699ff]" />
             <p className="text-sm font-medium text-[#6699ff]">{statusMessage}</p>
@@ -238,16 +381,11 @@ function DeepfakePanel() {
             </div>
             <p className="text-xs text-muted-foreground">{Math.round(progress)}%</p>
           </div>
-        ) : isUploading ? (
-          <div className="flex flex-col items-center gap-3">
-            <Loader2 className="h-10 w-10 animate-spin text-[#6699ff]" />
-            <p className="text-sm font-medium">Uploading file...</p>
-          </div>
         ) : file && previewUrl ? (
           <div className="flex flex-col items-center gap-3">
             <img
               src={previewUrl}
-              alt="Preview"
+              alt="Uploaded file preview"
               className="max-h-32 max-w-full rounded-lg object-contain shadow-sm"
             />
             <div>
@@ -274,7 +412,7 @@ function DeepfakePanel() {
           id="deepfake-file-input"
           aria-label="Choose an image file to analyze for deepfakes"
           onChange={(e) => handleFileSelect(e.target.files?.[0] || null)}
-          disabled={isUploading || isAnalyzing}
+          disabled={isProcessing}
         />
       </div>
       <div className="mt-3 flex flex-col gap-1 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
@@ -282,9 +420,9 @@ function DeepfakePanel() {
         <span>Max file size: 100MB</span>
       </div>
 
-      {file && !isAnalyzing && !isUploading && (
+      {file && !isProcessing && (
         <button
-          onClick={simulateAnalysis}
+          onClick={executePipeline}
           className="mt-5 rounded-full bg-[#6699ff] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[#6699ff]/90 transition-all"
         >
           Analyze Media
@@ -294,15 +432,15 @@ function DeepfakePanel() {
   );
 }
 
-// ======================= AI CONTENT PANEL =======================
-function AiPanel() {
+// ======================= AI CONTENT PANEL (PRODUCTION AWS PIPELINE) =======================
+function AiPanel({ onCheckLimit, onTrackScan, headers, onTriggerLimitModal }: PanelProps) {
   const navigate = useNavigate();
   const [mode, setMode] = useState<"file" | "text">("file");
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [textContent, setTextContent] = useState("");
-  const [isUploading, setIsUploading] = useState(false);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const [progress, setProgress] = useState(0);
   const [statusMessage, setStatusMessage] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -315,19 +453,34 @@ function AiPanel() {
 
   const handleFileSelect = async (selectedFile: File | null) => {
     if (selectedFile && (selectedFile.type.startsWith("image/") || selectedFile.type === "text/plain")) {
-      setIsUploading(true);
-      await new Promise((resolve) => setTimeout(resolve, 1200));
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      if (onCheckLimit()) return;
       setFile(selectedFile);
       if (selectedFile.type.startsWith("image/")) {
+        if (previewUrl) URL.revokeObjectURL(previewUrl);
         setPreviewUrl(URL.createObjectURL(selectedFile));
       } else {
         setPreviewUrl(null);
       }
-      setIsUploading(false);
     } else if (selectedFile) {
-      alert("Please select an image or text file");
+      alert("Please select an image or text file (.txt)");
     }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    if (!isProcessing && mode === "file") setIsDragging(true);
+  };
+
+  const handleDragLeave = () => {
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    if (isProcessing || mode !== "file") return;
+    const droppedFile = e.dataTransfer.files?.[0] || null;
+    handleFileSelect(droppedFile);
   };
 
   const resetAnalysis = () => {
@@ -337,85 +490,96 @@ function AiPanel() {
     setTextContent("");
     setProgress(0);
     setStatusMessage("");
-    setIsAnalyzing(false);
+    setIsProcessing(false);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  const simulateFileAnalysis = async () => {
-    if (!file) return;
-    setIsAnalyzing(true);
-    setProgress(0);
-    const steps = [
-      { progress: 15, message: "Loading media file..." },
-      { progress: 35, message: "Scanning for generative artifacts..." },
-      { progress: 60, message: "Analyzing texture consistency..." },
-      { progress: 80, message: "Comparing with AI model fingerprints..." },
-      { progress: 100, message: "Generating report..." },
-    ];
-    for (const step of steps) {
-      await new Promise((resolve) => setTimeout(resolve, 450));
-      setProgress(step.progress);
-      setStatusMessage(step.message);
-    }
-    const mockConfidence = 0.68 + Math.random() * 0.3;
-    const isAIGenerated = mockConfidence > 0.55;
-    setIsAnalyzing(false);
-    navigate({
-      to: "/result",
-      search: {
-        type: "ai",
-        data: {
-          isAIGenerated,
-          confidence: mockConfidence,
-          details: isAIGenerated
-            ? "High probability of AI generation. Detected patterns consistent with diffusion models and GAN outputs."
-            : "Likely human-created content. No significant AI-generation markers found.",
-        },
-        fileName: file?.name || "text_analysis",
-        timestamp: new Date().toISOString(),
-      },
-    });
-  };
+  const executePipeline = async () => {
+    if (onCheckLimit()) return;
+    setIsProcessing(true);
+    setProgress(5);
 
-  const simulateTextAnalysis = async () => {
-    if (!textContent.trim()) return;
-    setIsAnalyzing(true);
-    setProgress(0);
-    const steps = [
-      { progress: 20, message: "Parsing text input..." },
-      { progress: 45, message: "Analyzing linguistic patterns..." },
-      { progress: 70, message: "Checking perplexity & burstiness..." },
-      { progress: 90, message: "Comparing with AI writing models..." },
-      { progress: 100, message: "Finalizing verdict..." },
-    ];
-    for (const step of steps) {
-      await new Promise((resolve) => setTimeout(resolve, 400));
-      setProgress(step.progress);
-      setStatusMessage(step.message);
-    }
-    const mockConfidence = 0.6 + Math.random() * 0.35;
-    const isAIGenerated = mockConfidence > 0.5;
-    setIsAnalyzing(false);
-    navigate({
-      to: "/result",
-      search: {
-        type: "ai",
-        data: {
-          isAIGenerated,
-          confidence: mockConfidence,
-          details: isAIGenerated
-            ? "Text exhibits repetitive structures and low perplexity typical of LLM generation."
-            : "Text shows natural variation and human-like inconsistencies.",
-        },
-        fileName: "text_analysis",
-        timestamp: new Date().toISOString(),
-      },
-    });
-  };
+    try {
+      if (mode === "file" && file) {
+        setStatusMessage("Requesting binary file upload parameters...");
+        
+        const presignResponse = await axios.post(
+          `${API_BASE_URL}/detection/request-upload`,
+          { fileName: file.name, fileType: file.type, mode: "text" },
+          { headers }
+        );
 
-  const handleAnalyze = () => {
-    if (mode === "file" && file) simulateFileAnalysis();
-    else if (mode === "text" && textContent.trim()) simulateTextAnalysis();
+        const { uploadUrl, s3Key, fileUrl } = presignResponse.data;
+
+        setStatusMessage("Streaming document payload to cloud servers...");
+        setProgress(30);
+
+        await axios.put(uploadUrl, file, {
+          headers: { "Content-Type": file.type },
+          onUploadProgress: (progressEvent) => {
+            if (progressEvent.total) {
+              const percentage = Math.round((progressEvent.loaded * 40) / progressEvent.total);
+              setProgress(30 + percentage);
+            }
+          }
+        });
+
+        setStatusMessage("Executing generative structural classification check...");
+        setProgress(80);
+
+        const analysisResponse = await axios.post(
+          `${API_BASE_URL}/detection/analyze`,
+          { fileUrl, s3Key, fileName: file.name, detectionMode: "text" },
+          { headers }
+        );
+
+        setProgress(100);
+        onTrackScan();
+        setIsProcessing(false);
+
+        navigate({
+          to: "/result",
+          search: { 
+            type: "ai", 
+            data: analysisResponse.data.data, 
+            fileName: file.name, 
+            timestamp: new Date().toISOString() 
+          }
+        });
+
+      } else if (mode === "text" && textContent.trim()) {
+        setStatusMessage("Evaluating custom textual patterns...");
+        setProgress(40);
+
+        const analysisResponse = await axios.post(
+          `${API_BASE_URL}/detection/analyze-text`,
+          { text: textContent },
+          { headers }
+        );
+
+        setProgress(100);
+        onTrackScan();
+        setIsProcessing(false);
+
+        navigate({
+          to: "/result",
+          search: { 
+            type: "ai", 
+            data: analysisResponse.data.data, 
+            fileName: "Text Analysis", 
+            timestamp: new Date().toISOString() 
+          }
+        });
+      }
+    } catch (err: any) {
+      setIsProcessing(false);
+      setProgress(0);
+      if (err?.response?.status === 429) {
+        onTriggerLimitModal();
+      } else {
+        alert(err?.response?.data?.message || "Pipeline integration fault.");
+      }
+    }
   };
 
   return (
@@ -455,15 +619,20 @@ function AiPanel() {
         <>
           <div
             className={`mt-5 flex min-h-52 cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed transition-all ${
-              isAnalyzing
+              isProcessing
                 ? "border-[#6699ff]/40 bg-[#6699ff]/5"
+                : isDragging
+                ? "border-[#6699ff] bg-[#6699ff]/20 scale-[0.99]"
                 : file
                 ? "border-[#6699ff]/70 bg-[#6699ff]/15"
                 : "border-[#6699ff]/40 bg-[#6699ff]/10 hover:border-[#6699ff]/70 hover:bg-[#6699ff]/15"
             } px-4 py-8 text-center`}
-            onClick={() => !isAnalyzing && fileInputRef.current?.click()}
+            onClick={() => !isProcessing && fileInputRef.current?.click()}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
           >
-            {isAnalyzing ? (
+            {isProcessing ? (
               <div className="flex flex-col items-center gap-3">
                 <Loader2 className="h-10 w-10 animate-spin text-[#6699ff]" />
                 <p className="text-sm font-medium text-[#6699ff]">{statusMessage}</p>
@@ -475,17 +644,12 @@ function AiPanel() {
                 </div>
                 <p className="text-xs text-muted-foreground">{Math.round(progress)}%</p>
               </div>
-            ) : isUploading ? (
-              <div className="flex flex-col items-center gap-3">
-                <Loader2 className="h-10 w-10 animate-spin text-[#6699ff]" />
-                <p className="text-sm font-medium">Uploading file...</p>
-              </div>
             ) : file ? (
               <div className="flex flex-col items-center gap-3">
                 {previewUrl ? (
                   <img
                     src={previewUrl}
-                    alt="Preview"
+                    alt="Uploaded image preview"
                     className="max-h-32 max-w-full rounded-lg object-contain shadow-sm"
                   />
                 ) : (
@@ -515,15 +679,14 @@ function AiPanel() {
               id="ai-file-input"
               aria-label="Upload an image or text file for AI content analysis"
               onChange={(e) => handleFileSelect(e.target.files?.[0] || null)}
-              disabled={isUploading || isAnalyzing}
+              disabled={isProcessing}
             />
           </div>
           <div className="mt-3 text-sm text-muted-foreground">Supported: Images (JPG, PNG, WEBP) or .txt files</div>
         </>
       ) : (
-        // Text mode with loader during analysis
         <>
-          {isAnalyzing ? (
+          {isProcessing ? (
             <div className="mt-5 flex min-h-52 flex-col items-center justify-center rounded-xl border-2 border-dashed border-[#6699ff]/40 bg-[#6699ff]/5 px-4 py-8 text-center">
               <Loader2 className="h-10 w-10 animate-spin text-[#6699ff]" />
               <p className="mt-2 text-sm font-medium text-[#6699ff]">{statusMessage}</p>
@@ -540,20 +703,19 @@ function AiPanel() {
               id="ai-text-input"
               rows={6}
               value={textContent}
-              onChange={(e) => {
-                setTextContent(e.target.value);
-              }}
+              onChange={(e) => setTextContent(e.target.value)}
               placeholder="Paste any text you suspect was generated by AI (e.g., ChatGPT, Claude, Gemini)..."
               className="mt-4 w-full rounded-xl border border-input bg-background p-4 text-base outline-none focus:border-[#6699ff] focus:ring-2 focus:ring-[#6699ff]/20"
-              disabled={isAnalyzing}
+              disabled={isProcessing}
+              aria-label="Paste suspect text content here"
             />
           )}
         </>
       )}
 
-      {((mode === "file" && file) || (mode === "text" && textContent.trim())) && !isAnalyzing && !isUploading && (
+      {((mode === "file" && file) || (mode === "text" && textContent.trim())) && !isProcessing && (
         <button
-          onClick={handleAnalyze}
+          onClick={executePipeline}
           className="mt-5 rounded-full bg-[#6699ff] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[#6699ff]/90 transition-all"
         >
           Analyze Content
@@ -563,8 +725,8 @@ function AiPanel() {
   );
 }
 
-// ======================= PHISHING PANEL =======================
-function PhishingPanel() {
+// ======================= PHISHING PANEL (PRODUCTION ENDPOINT DISPATCH) =======================
+function PhishingPanel({ onCheckLimit, onTrackScan, headers, onTriggerLimitModal }: PanelProps) {
   const navigate = useNavigate();
   const [url, setUrl] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -578,47 +740,44 @@ function PhishingPanel() {
     setIsAnalyzing(false);
   };
 
-  const simulateUrlAnalysis = async () => {
+  const handleUrlScan = async () => {
     if (!url.trim()) return;
+    if (onCheckLimit()) return;
+
     setIsAnalyzing(true);
-    setProgress(0);
-    const steps = [
-      { progress: 10, message: "Validating URL format..." },
-      { progress: 30, message: "Checking domain reputation..." },
-      { progress: 55, message: "Scanning for phishing indicators..." },
-      { progress: 75, message: "Analyzing URL structure & redirects..." },
-      { progress: 95, message: "Cross-referencing threat databases..." },
-      { progress: 100, message: "Risk assessment complete." },
-    ];
-    for (const step of steps) {
-      await new Promise((resolve) => setTimeout(resolve, 400));
-      setProgress(step.progress);
-      setStatusMessage(step.message);
-    }
-    const urlLower = url.toLowerCase();
-    const suspiciousKeywords = ["verify", "secure", "login", "account", "update", "confirm", "bank", "paypal", "apple"];
-    const suspiciousScore = suspiciousKeywords.filter((k) => urlLower.includes(k)).length / suspiciousKeywords.length;
-    const isMalicious = suspiciousScore > 0.3 || urlLower.includes("-verify-") || urlLower.includes("secure-");
-    const confidence = 0.6 + suspiciousScore * 0.4;
-    const riskLevel = confidence > 0.8 ? "high" : confidence > 0.55 ? "medium" : "low";
-    setIsAnalyzing(false);
-    navigate({
-      to: "/result",
-      search: {
-        type: "phishing",
-        data: {
-          isMalicious,
-          confidence: Math.min(confidence, 0.98),
-          details: isMalicious
-            ? "This URL exhibits phishing characteristics: domain impersonation, suspicious redirects, and deceptive path structure."
-            : "No obvious phishing patterns detected. Domain appears legitimate based on preliminary heuristics.",
-          riskLevel,
-          url,
+    setProgress(20);
+    setStatusMessage("Querying domain reputation systems...");
+
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/detection/analyze-url`,
+        { url },
+        { headers }
+      );
+
+      setProgress(100);
+      onTrackScan();
+      setIsAnalyzing(false);
+
+      navigate({
+        to: "/result",
+        search: {
+          type: "phishing",
+          data: response.data.data,
+          fileName: url,
+          timestamp: new Date().toISOString(),
         },
-        fileName: url,
-        timestamp: new Date().toISOString(),
-      },
-    });
+      });
+    } catch (err: any) {
+      setIsAnalyzing(false);
+      setProgress(0);
+
+      if (err?.response?.status === 429) {
+        onTriggerLimitModal();
+      } else {
+        alert(err?.response?.data?.message || "URL lookup failed.");
+      }
+    }
   };
 
   return (
@@ -645,7 +804,7 @@ function PhishingPanel() {
 
       <div className="mt-4 flex flex-wrap gap-2">
         <button
-          onClick={simulateUrlAnalysis}
+          onClick={handleUrlScan}
           disabled={!url.trim() || isAnalyzing}
           className="rounded-full bg-[#6699ff] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#6699ff]/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
         >
