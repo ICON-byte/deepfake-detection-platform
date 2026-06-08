@@ -170,44 +170,69 @@ function DeepfakePanel() {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  const simulateAnalysis = async () => {
+  const handleAnalyze = async () => {
     if (!file) return;
     setIsAnalyzing(true);
     setProgress(0);
+    setStatusMessage("Preparing upload...");
 
-    const steps = [
-      { progress: 10, message: "Loading media file..." },
-      { progress: 25, message: "Extracting facial landmarks..." },
-      { progress: 45, message: "Analyzing pixel anomalies & artifacts..." },
-      { progress: 65, message: "Running neural network detection..." },
-      { progress: 85, message: "Cross-referencing deepfake signatures..." },
-      { progress: 100, message: "Finalizing results..." },
-    ];
+    try {
+      // 1. Request presigned URL
+      const uploadRequest = await fetch("/api/detection/request-upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fileName: file.name,
+          fileType: file.type,
+          mode: "image",
+        }),
+      });
+      const { presignedUrl, s3Key, fileUrl } = await uploadRequest.json();
 
-    for (const step of steps) {
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      setProgress(step.progress);
-      setStatusMessage(step.message);
-    }
+      // 2. Upload to S3
+      setStatusMessage("Uploading to cloud...");
+      await fetch(presignedUrl, {
+        method: "PUT",
+        body: file,
+        headers: { "Content-Type": file.type },
+      });
 
-    const mockConfidence = 0.72 + Math.random() * 0.25;
-    const isDeepfake = mockConfidence > 0.65;
-    setIsAnalyzing(false);
-    navigate({
-      to: "/result",
-      search: {
-        type: "deepfake",
-        data: {
-          isDeepfake,
-          confidence: mockConfidence,
-          details: isDeepfake
-            ? "Multiple manipulation traces detected including inconsistent lighting and warped facial features."
-            : "No significant deepfake patterns found. Image appears authentic.",
+      // 3. Analyze
+      setStatusMessage("Analyzing facial subjects...");
+      const analyzeRequest = await fetch("/api/detection/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fileUrl,
+          s3Key,
+          fileName: file.name,
+          detectionMode: "image",
+        }),
+      });
+      const result = await analyzeRequest.json();
+
+      if (!result.success) throw new Error(result.message);
+
+      setIsAnalyzing(false);
+      navigate({
+        to: "/result",
+        search: {
+          type: "deepfake",
+          data: {
+            isDeepfake: result.data.status === "Manipulated",
+            confidence: result.data.confidenceScore / 100,
+            details: result.message || (result.data.status === "Manipulated"
+              ? "Multiple manipulation traces detected including inconsistent lighting and warped facial features."
+              : "No significant deepfake patterns found. Image appears authentic."),
+          },
+          fileName: file.name,
+          timestamp: new Date().toISOString(),
         },
-        fileName: file.name,
-        timestamp: new Date().toISOString(),
-      },
-    });
+      });
+    } catch (error: any) {
+      alert(error.message || "Analysis failed");
+      setIsAnalyzing(false);
+    }
   };
 
   return (
@@ -284,7 +309,7 @@ function DeepfakePanel() {
 
       {file && !isAnalyzing && !isUploading && (
         <button
-          onClick={simulateAnalysis}
+          onClick={handleAnalyze}
           className="mt-5 rounded-full bg-[#6699ff] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[#6699ff]/90 transition-all"
         >
           Analyze Media
@@ -314,7 +339,7 @@ function AiPanel() {
   }, [previewUrl]);
 
   const handleFileSelect = async (selectedFile: File | null) => {
-    if (selectedFile && (selectedFile.type.startsWith("image/") || selectedFile.type === "text/plain")) {
+    if (selectedFile && (selectedFile.type.startsWith("image/") || selectedFile.type.startsWith("video/") || selectedFile.type === "text/plain")) {
       setIsUploading(true);
       await new Promise((resolve) => setTimeout(resolve, 1200));
       if (previewUrl) URL.revokeObjectURL(previewUrl);
@@ -326,7 +351,7 @@ function AiPanel() {
       }
       setIsUploading(false);
     } else if (selectedFile) {
-      alert("Please select an image or text file");
+      alert("Please select an image, video, or text file");
     }
   };
 
@@ -341,81 +366,103 @@ function AiPanel() {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  const simulateFileAnalysis = async () => {
-    if (!file) return;
+  const handleAnalyze = async () => {
     setIsAnalyzing(true);
     setProgress(0);
-    const steps = [
-      { progress: 15, message: "Loading media file..." },
-      { progress: 35, message: "Scanning for generative artifacts..." },
-      { progress: 60, message: "Analyzing texture consistency..." },
-      { progress: 80, message: "Comparing with AI model fingerprints..." },
-      { progress: 100, message: "Generating report..." },
-    ];
-    for (const step of steps) {
-      await new Promise((resolve) => setTimeout(resolve, 450));
-      setProgress(step.progress);
-      setStatusMessage(step.message);
-    }
-    const mockConfidence = 0.68 + Math.random() * 0.3;
-    const isAIGenerated = mockConfidence > 0.55;
-    setIsAnalyzing(false);
-    navigate({
-      to: "/result",
-      search: {
-        type: "ai",
-        data: {
-          isAIGenerated,
-          confidence: mockConfidence,
-          details: isAIGenerated
-            ? "High probability of AI generation. Detected patterns consistent with diffusion models and GAN outputs."
-            : "Likely human-created content. No significant AI-generation markers found.",
-        },
-        fileName: file?.name || "text_analysis",
-        timestamp: new Date().toISOString(),
-      },
-    });
-  };
+    setStatusMessage("Preparing analysis...");
 
-  const simulateTextAnalysis = async () => {
-    if (!textContent.trim()) return;
-    setIsAnalyzing(true);
-    setProgress(0);
-    const steps = [
-      { progress: 20, message: "Parsing text input..." },
-      { progress: 45, message: "Analyzing linguistic patterns..." },
-      { progress: 70, message: "Checking perplexity & burstiness..." },
-      { progress: 90, message: "Comparing with AI writing models..." },
-      { progress: 100, message: "Finalizing verdict..." },
-    ];
-    for (const step of steps) {
-      await new Promise((resolve) => setTimeout(resolve, 400));
-      setProgress(step.progress);
-      setStatusMessage(step.message);
-    }
-    const mockConfidence = 0.6 + Math.random() * 0.35;
-    const isAIGenerated = mockConfidence > 0.5;
-    setIsAnalyzing(false);
-    navigate({
-      to: "/result",
-      search: {
-        type: "ai",
-        data: {
-          isAIGenerated,
-          confidence: mockConfidence,
-          details: isAIGenerated
-            ? "Text exhibits repetitive structures and low perplexity typical of LLM generation."
-            : "Text shows natural variation and human-like inconsistencies.",
-        },
-        fileName: "text_analysis",
-        timestamp: new Date().toISOString(),
-      },
-    });
-  };
+    try {
+      let finalFileUrl = "";
+      let finalS3Key = "";
+      let finalFileName = "";
 
-  const handleAnalyze = () => {
-    if (mode === "file" && file) simulateFileAnalysis();
-    else if (mode === "text" && textContent.trim()) simulateTextAnalysis();
+      if (mode === "file") {
+        if (!file) return;
+        finalFileName = file.name;
+        // 1. Request presigned URL
+        setStatusMessage("Requesting cloud access...");
+        const uploadRequest = await fetch("/api/detection/request-upload", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            fileName: file.name,
+            fileType: file.type,
+            mode: "ai",
+          }),
+        });
+        const { presignedUrl, s3Key, fileUrl } = await uploadRequest.json();
+        finalFileUrl = fileUrl;
+        finalS3Key = s3Key;
+
+        // 2. Upload to S3
+        setStatusMessage("Uploading to cloud...");
+        await fetch(presignedUrl, {
+          method: "PUT",
+          body: file,
+          headers: { "Content-Type": file.type },
+        });
+      } else {
+        if (!textContent.trim()) return;
+        finalFileName = "text_input.txt";
+        // 1. Request presigned URL for text
+        setStatusMessage("Processing text input...");
+        const uploadRequest = await fetch("/api/detection/request-upload", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            fileName: "text_input.txt",
+            fileType: "text/plain",
+            mode: "text",
+          }),
+        });
+        const { presignedUrl, s3Key, fileUrl } = await uploadRequest.json();
+        finalFileUrl = fileUrl;
+        finalS3Key = s3Key;
+
+        // 2. Upload text to S3
+        await fetch(presignedUrl, {
+          method: "PUT",
+          body: textContent,
+          headers: { "Content-Type": "text/plain" },
+        });
+      }
+
+      // 3. Analyze
+      setStatusMessage("Running AI analysis...");
+      const analyzeRequest = await fetch("/api/detection/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fileUrl: finalFileUrl,
+          s3Key: finalS3Key,
+          fileName: finalFileName,
+          detectionMode: mode === "file" ? (file?.type.startsWith("video/") ? "video" : "image") : "text",
+        }),
+      });
+      const result = await analyzeRequest.json();
+
+      if (!result.success) throw new Error(result.message);
+
+      setIsAnalyzing(false);
+      navigate({
+        to: "/result",
+        search: {
+          type: "ai",
+          data: {
+            isAIGenerated: result.data.status === "Manipulated",
+            confidence: result.data.confidenceScore / 100,
+            details: result.message || (result.data.status === "Manipulated"
+              ? "Synthetic artifacts detected consistent with AI generation."
+              : "Likely human-created content."),
+          },
+          fileName: finalFileName,
+          timestamp: new Date().toISOString(),
+        },
+      });
+    } catch (error: any) {
+      alert(error.message || "Analysis failed");
+      setIsAnalyzing(false);
+    }
   };
 
   return (

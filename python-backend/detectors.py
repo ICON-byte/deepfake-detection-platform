@@ -237,6 +237,173 @@ class DeepfakeTextDetector:
         return status, confidence_score
 
 
+class SyntheticMediaDetector:
+    def __init__(self, model_path: str, device: Optional[str] = None) -> None:
+        if device is None:
+            self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        else:
+            self.device = torch.device(device)
+    
+        self.classifier = self._load_model(model_path).to(self.device)
+        self.classifier.eval()
+
+        self.MEAN = [0.485, 0.456, 0.406]
+        self.STD = [0.229, 0.224, 0.225]
+        self.SIZE = 256
+        
+        self.augmentation = transforms.Compose([
+            transforms.Resize((self.SIZE, self.SIZE)),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=self.MEAN, std=self.STD),
+        ])
+    
+    def _load_model(self, path: str) -> nn.Module:
+        # Reusing EfficientNetV2-S as it's a standard, efficient choice for vision tasks
+        model = efficientnet_v2_s(weights=None)
+        in_features = model.classifier[1].in_features
+        model.classifier[1] = nn.Linear(in_features, 1) # type: ignore
+        
+        # In a real scenario, we'd load weights trained on GenImage or CNN-Synth
+        if os.path.exists(path):
+            model.load_state_dict(torch.load(path, map_location=self.device))
+        
+        return model
+
+    def predict_image(self, image_path: str) -> Tuple[str, float]:
+        image = cv2.imread(image_path)
+        if image is None:
+            return "Could not read image", 0.0
+
+        image_pil = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+        input_tensor = self.augmentation(image_pil).unsqueeze(0).to(self.device) # type: ignore
+
+        with torch.no_grad():
+            logits = self.classifier(input_tensor).view(-1)
+            # Binary classification: 0 = Real, 1 = Synthetic
+            prob = torch.sigmoid(logits).item()
+
+        label = "Synthetic" if prob > 0.5 else "Authentic"
+        confidence_score = int(prob * 100) if label == "Synthetic" else int((1 - prob) * 100)
+
+        return label, float(confidence_score)
+
+    def predict_video(self, video_path: str, frame_skip: int = 20) -> Tuple[str, float]:
+        cap = cv2.VideoCapture(video_path)
+        if not cap.isOpened():
+            return "Could not open video", 0.0
+
+        all_probs: List[float] = []
+        frame_count = 0
+
+        while True:
+            ret, frame = cap.read()
+            if not ret: break
+
+            if frame_count % frame_skip == 0:
+                frame_pil = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+                input_tensor = self.augmentation(frame_pil).unsqueeze(0).to(self.device) # type: ignore
+                
+                with torch.no_grad():
+                    logits = self.classifier(input_tensor).view(-1)
+                    prob = torch.sigmoid(logits).item()
+                    all_probs.append(prob)
+            
+            frame_count += 1
+        cap.release()
+
+        if not all_probs:
+            return "No frames processed", 0.0
+
+        final_prob = sum(all_probs) / len(all_probs)
+        label = "Synthetic" if final_prob > 0.5 else "Authentic"
+        confidence_score = int(final_prob * 100) if label == "Synthetic" else int((1 - final_prob) * 100)
+
+        return label, float(confidence_score)
+
+
+class HFInferenceDetector:
+    def __init__(self, model_repo: str, api_token: str) -> None:
+        self.model_repo = model_repo
+        self.api_url = f"https://api-inference.huggingface.co/models/{model_repo}"
+        self.headers = {"Authorization": f"Bearer {api_token}"}
+
+    def predict_image(self, image_path: str) -> Tuple[str, float]:
+        with open(image_path, "rb") as f:
+            data = f.read()
+
+        try:
+            # We use a loop/retry because the Inference API might be "loading" the model
+            for _ in range(3):
+                response = requests.post(self.api_url, headers=self.headers, data=data, timeout=30)
+                result = response.json()
+                
+                if isinstance(result, dict) and "error" in result and "loading" in result["error"]:
+                    print(f"Model is loading, retrying in 5s...")
+                    import time
+                    time.sleep(10)
+                    continue
+                break
+
+            if not isinstance(result, list):
+                print(f"HF API Error: {result}")
+                return "API Error", 0.0
+
+            # The API returns a list of labels and scores: [{"label": "fake", "score": 0.99}, ...]
+            # We find the one with the highest score
+            top_prediction = max(result, key=lambda x: x["score"])
+            label = top_prediction["label"].capitalize()
+            # Normalize label names (some models use 'fake'/'real', others 'synthetic'/'authentic')
+            if label.lower() in ["fake", "synthetic", "generated"]:
+                label = "Synthetic"
+            else:
+                label = "Authentic"
+            
+            confidence = float(top_prediction["score"] * 100)
+            return label, confidence
+
+        except Exception as e:
+            print(f"HF Inference Failure: {str(e)}")
+            return "Inference Error", 0.0
+
+    def predict_video(self, video_path: str, frame_skip: int = 30) -> Tuple[str, float]:
+        cap = cv2.VideoCapture(video_path)
+        all_probs: List[float] = []
+        frame_count = 0
+        
+        # To avoid hitting rate limits too hard, we only sample a few frames for the API
+        max_samples = 5 
+        sampled = 0
+
+        while sampled < max_samples:
+            ret, frame = cap.read()
+            if not ret: break
+
+            if frame_count % frame_skip == 0:
+                with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
+                    cv2.imwrite(tmp.name, frame)
+                    tmp_name = tmp.name
+                
+                label, confidence = self.predict_image(tmp_name)
+                os.remove(tmp_name)
+
+                if label != "Inference Error":
+                    # Convert back to a 0-1 probability for "Synthetic"
+                    prob = (confidence / 100) if label == "Synthetic" else (1 - (confidence / 100))
+                    all_probs.append(prob)
+                
+                sampled += 1
+            frame_count += 1
+        cap.release()
+
+        if not all_probs:
+            return "Processing Error", 0.0
+
+        final_prob = sum(all_probs) / len(all_probs)
+        label = "Synthetic" if final_prob > 0.5 else "Authentic"
+        conf = final_prob * 100 if label == "Synthetic" else (1 - final_prob) * 100
+        return label, float(conf)
+
+
 class PhishingDetector:
     def __init__(self, model_path: str, scaler_path: str, whitelist_path: str) -> None:
         self.model = joblib.load(model_path)
