@@ -37,8 +37,10 @@ class DetectionRequest(BaseModel):
 
 # Model Constants
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-AUDIO_MODEL_PATH = os.path.join(SCRIPT_DIR, "audio-model")
+LOCAL_TMP_DIR = os.path.join(SCRIPT_DIR, "tmp")
+os.makedirs(LOCAL_TMP_DIR, exist_ok=True)
 
+AUDIO_MODEL_PATH = os.path.join(SCRIPT_DIR, "audio-model")
 VISION_MODEL_PATH = os.path.join(SCRIPT_DIR, "vision-model/deepfake_face_detector.pth")
 VISION_FACE_DETECTOR_PATH = os.path.join(SCRIPT_DIR, "vision-model/yolov8n-face.pt")
 
@@ -223,10 +225,16 @@ async def predict_image(payload: DetectionRequest):
     try:
         response = download_asset(payload.fileUrl, "image")
 
-        with tempfile.NamedTemporaryFile(suffix=".jpg", delete=True) as tmp:
+        with tempfile.NamedTemporaryFile(suffix=".jpg", dir=LOCAL_TMP_DIR, delete=False) as tmp:
+            tmp_name = tmp.name
             tmp.write(response.content)
-            tmp.flush()
-            status, confidence_score = vision_model.predict_image(tmp.name)
+            tmp.close()
+
+        try:
+            status, confidence_score = vision_model.predict_image(tmp_name)
+        finally:
+            if os.path.exists(tmp_name):
+                os.remove(tmp_name)
 
         if confidence_score is None:
             raise HTTPException(status_code=422, detail="No face detected or image is unreadable.")
@@ -260,10 +268,16 @@ async def predict_video(payload: DetectionRequest):
     try:
         response = download_asset(payload.fileUrl, "video")
 
-        with tempfile.NamedTemporaryFile(suffix=".mp4", delete=True) as tmp:
+        with tempfile.NamedTemporaryFile(suffix=".mp4", dir=LOCAL_TMP_DIR, delete=False) as tmp:
+            tmp_name = tmp.name
             tmp.write(response.content)
-            tmp.flush()
-            status, confidence_score = vision_model.predict_video(tmp.name)
+            tmp.close()
+
+        try:
+            status, confidence_score = vision_model.predict_video(tmp_name)
+        finally:
+            if os.path.exists(tmp_name):
+                os.remove(tmp_name)
 
         if confidence_score is None:
             raise HTTPException(status_code=422, detail="No face detected or video is unreadable.")
@@ -364,10 +378,16 @@ async def predict_synthetic_image(payload: DetectionRequest):
 
         response = download_asset(payload.fileUrl, "synthetic image")
 
-        with tempfile.NamedTemporaryFile(suffix=".jpg", delete=True) as tmp:
+        with tempfile.NamedTemporaryFile(suffix=".jpg", dir=LOCAL_TMP_DIR, delete=False) as tmp:
+            tmp_name = tmp.name
             tmp.write(response.content)
-            tmp.flush()
-            status, confidence_score = synthetic_model.predict_image(tmp.name)
+            tmp.close()
+
+        try:
+            status, confidence_score = synthetic_model.predict_image(tmp_name)
+        finally:
+            if os.path.exists(tmp_name):
+                os.remove(tmp_name)
 
         print(f"Synthetic Image Prediction Complete: Result={status}, Confidence={confidence_score}%")
 
@@ -401,10 +421,16 @@ async def predict_synthetic_video(payload: DetectionRequest):
 
         response = download_asset(payload.fileUrl, "synthetic video")
 
-        with tempfile.NamedTemporaryFile(suffix=".mp4", delete=True) as tmp:
+        with tempfile.NamedTemporaryFile(suffix=".mp4", dir=LOCAL_TMP_DIR, delete=False) as tmp:
+            tmp_name = tmp.name
             tmp.write(response.content)
-            tmp.flush()
-            status, confidence_score = synthetic_model.predict_video(tmp.name)
+            tmp.close()
+
+        try:
+            status, confidence_score = synthetic_model.predict_video(tmp_name)
+        finally:
+            if os.path.exists(tmp_name):
+                os.remove(tmp_name)
 
         print(f"Synthetic Video Prediction Complete: Result={status}, Confidence={confidence_score}%")
 
