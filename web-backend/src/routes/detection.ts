@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { PutObjectCommand } from '@aws-sdk/client-s3';
+import { PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import axios from 'axios';
 import { s3Client } from '../config/S3';
@@ -32,10 +32,11 @@ interface RequestUploadBody {
 }
 
 interface AnalyzeRequestBody {
-  fileUrl: string;
-  s3Key: string;
+  fileUrl?: string;
+  url?: string;
+  s3Key?: string;
   fileName: string;
-  detectionMode: 'audio' | 'image' | 'video' | 'text';
+  detectionMode: 'audio' | 'image' | 'video' | 'text' | 'phishing';
 }
 
 // ==========================================
@@ -89,12 +90,12 @@ router.post('/analyze', optionalAuth, checkRateLimit, async (
   res: Response
 ): Promise<any> => {
   try {
-    const { fileUrl, s3Key, fileName, detectionMode } = req.body;
+    const { fileUrl, s3Key, fileName, detectionMode, url } = req.body;
 
-    if (!fileUrl || !s3Key || !fileName || !detectionMode) {
+    if (!fileName || !detectionMode || (!fileUrl && !url)) {
       return res.status(400).json({ 
         success: false, 
-        message: 'Missing data payload (fileUrl, s3Key, fileName, detectionMode)' 
+        message: 'Missing data payload (fileUrl/url, fileName, detectionMode)' 
       });
     }
 
@@ -106,18 +107,58 @@ router.post('/analyze', optionalAuth, checkRateLimit, async (
     if (detectionMode === 'audio') targetEndpoint = 'predict-audio';
     else if (detectionMode === 'video') targetEndpoint = 'predict-video';
     else if (detectionMode === 'text') targetEndpoint = 'predict-text';
+    else if (detectionMode === 'phishing') targetEndpoint = 'predict-phishing';
 
-    const pythonServerUrl = `${process.env.PYTHON_AI_URL || 'http://localhost:8000'}/${targetEndpoint}`;
+    const pythonServerUrl = `${process.env.PYTHON_AI_URL || 'http://localhost:8000'}`;
     
-    console.log(`🤖 Routing token to AI Framework -> [${pythonServerUrl}]: ${fileUrl}`);
+    // 1.5 Generate a GET presigned URL for the Python backend if we have an s3Key to bypass public access issues
+    let accessUrl = fileUrl || url;
+    if (s3Key) {
+      try {
+        const bucketName = process.env.AWS_BUCKET_NAME || 'truthlens-bucket';
+        const getCommand = new GetObjectCommand({
+          Bucket: bucketName,
+          Key: s3Key,
+        });
+        accessUrl = await getSignedUrl(s3Client, getCommand, { expiresIn: 3600 });
+        console.log(`🔑 Generated temporary read access for Python Core: ${s3Key}`);
+      } catch (s3Error) {
+        console.warn('⚠️ Failed to generate presigned GET URL, falling back to public URL:', (s3Error as Error).message);
+      }
+    }
+
+    console.log(`🤖 Routing token to AI Framework -> [${pythonServerUrl}/${targetEndpoint}]: ${accessUrl}`);
     
     // 2. Transmit standard payload to target AI engine channel
-    const aiResponse = await axios.post(pythonServerUrl, { fileUrl });
-    const aiData = aiResponse.data;
+    let aiData;
+    let fallbackPerformed = false;
 
-    // 3. Normalize state properties: convert Python "Fake" to Mongoose "Manipulated", and anything else to "Authentic"
+    try {
+      const payload = detectionMode === 'phishing' ? { url: url || fileUrl } : { fileUrl: accessUrl };
+      const aiResponse = await axios.post(`${pythonServerUrl}/${targetEndpoint}`, payload);
+      aiData = aiResponse.data;
+    } catch (error: any) {
+      // 2b. Fallback Logic: If no face detected, try general synthetic media scan
+      if (error.response && error.response.status === 422 && (detectionMode === 'video' || detectionMode === 'image')) {
+        console.log(`⚠️ No face detected. Falling back to general synthetic scan for ${detectionMode}...`);
+        const fallbackEndpoint = detectionMode === 'video' ? 'predict-synthetic-video' : 'predict-synthetic-image';
+        
+        try {
+          const fallbackResponse = await axios.post(`${pythonServerUrl}/${fallbackEndpoint}`, { fileUrl: accessUrl });
+          aiData = fallbackResponse.data;
+          fallbackPerformed = true;
+        } catch (fallbackError: any) {
+          throw fallbackError; // Re-throw if fallback also fails
+        }
+      } else {
+        throw error;
+      }
+    }
+
+    // 3. Normalize state properties: convert Python "Fake" or "Synthetic" to Mongoose "Manipulated"
     const mappedStatus: 'Authentic' | 'Manipulated' = 
-      (aiData.status && aiData.status.toLowerCase() === 'fake') ? 'Manipulated' : 'Authentic';
+      (aiData.status && (aiData.status.toLowerCase() === 'fake' || aiData.status.toLowerCase() === 'synthetic')) 
+        ? 'Manipulated' : 'Authentic';
 
     // 4. Record metadata metrics inside database cluster
     const finalizedReport = await ScanHistory.create({
@@ -128,18 +169,20 @@ router.post('/analyze', optionalAuth, checkRateLimit, async (
       s3Key,
       confidenceScore: aiData.confidenceScore ?? 0,
       status: mappedStatus,
-      detectionMode,
+      detectionMode: detectionMode as any,
       analysisBreakdown: {
-        pixelAnalysis: aiData.breakdown?.pixelAnalysis ?? 0,
-        compression: aiData.breakdown?.compression ?? 0,
-        frequency: aiData.breakdown?.frequency ?? 0,
+        pixelAnalysis: aiData.breakdown?.pixelAnalysis || aiData.breakdown?.textureArtifacts || 0,
+        compression: aiData.breakdown?.compression || aiData.breakdown?.globalCoherence || 0,
+        frequency: aiData.breakdown?.frequency || aiData.breakdown?.frameConsistency || 0,
         metadata: aiData.breakdown?.metadata ?? 0,
       }
     });
 
     return res.json({
       success: true,
-      data: finalizedReport
+      data: finalizedReport,
+      fallbackPerformed,
+      message: fallbackPerformed ? 'No facial subjects detected. Performed general synthetic media scan instead.' : undefined
     });
 
   } catch (error: any) {

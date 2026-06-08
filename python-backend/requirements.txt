@@ -16,3 +16,4 @@ pandas
 tldextract
 numpy
 scipy
+python-dotenv
