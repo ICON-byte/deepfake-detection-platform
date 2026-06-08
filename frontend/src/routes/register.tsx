@@ -92,14 +92,8 @@ function RegisterPage() {
 
   return (
     <SiteLayout>
-      <section className="mx-auto grid min-h-[calc(100vh-4rem)] max-w-6xl gap-0 px-0 pt-30 md:grid-cols-2">
-        {/* Left */}
-        <div className="flex flex-col justify-start bg-[#f4f6ff] px-6 pt-120 pb-12 sm:px-12">
-          <div className="mb-20">
-            <div className="absolute top-50 left-25">
-              <img src="/images/logo.svg" alt="NeoCloud" className="h-10 w-auto" />
-            </div>
-          </div>
+      <section className="mx-auto min-h-[calc(100vh-4rem)] max-w-6xl px-4 py-20 md:grid md:grid-cols-2 md:gap-12 md:py-24">
+        <div className="flex flex-col justify-center rounded-3xl bg-[#f4f6ff] p-10 sm:p-14">
           <h1 className="text-3xl font-bold sm:text-4xl">
             Get Started with
             <br />
@@ -111,8 +105,7 @@ function RegisterPage() {
           </p>
         </div>
 
-        {/* Right - form */}
-        <div className="flex flex-col justify-center px-6 py-12 sm:px-12">
+        <div className="flex flex-col justify-center px-4 py-10 sm:px-8">
           <div className="mx-auto w-full max-w-sm">
             <h2 className="text-2xl font-bold text-gray-900">
               Create your account
