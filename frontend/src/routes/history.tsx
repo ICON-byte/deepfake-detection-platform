@@ -150,35 +150,33 @@ function HistoryPage() {
     switch (status) {
       case "real":
         return (
-          <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700 dark:bg-green-900/30 dark:text-green-400">
+          <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium text-green-700 dark:text-green-400">
             <CheckCircle2 className="h-3 w-3" /> Authentic
           </span>
         );
       case "manipulated":
         return (
-          <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700 dark:bg-red-900/30 dark:text-red-400">
+          <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium text-red-700 dark:text-red-400">
             <XCircle className="h-3 w-3" /> Manipulated
           </span>
         );
       case "suspicious":
         return (
-          <span className="inline-flex items-center gap-1 rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">
+          <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium text-yellow-700 dark:text-yellow-400">
             <AlertTriangle className="h-3 w-3" /> Suspicious
           </span>
         );
       case "phishing":
         return (
-          <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700 dark:bg-red-900/30 dark:text-red-400">
+          <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium text-red-700 dark:text-red-400">
             <AlertCircle className="h-3 w-3" /> Phishing
           </span>
         );
     }
   };
 
-  const getConfidenceColor = (confidence: number) => {
-    if (confidence >= 70) return "text-red-600 dark:text-red-400";
-    if (confidence >= 40) return "text-yellow-600 dark:text-yellow-400";
-    return "text-green-600 dark:text-green-400";
+  const getConfidenceColor = (_confidence: number) => {
+    return "text-black dark:text-white";
   };
 
   const formatDate = (date: Date) => {
@@ -324,7 +322,7 @@ function HistoryPage() {
                   </Link>
                   <button
                     onClick={() => handleDelete(item.id)}
-                    className="inline-flex items-center gap-1 rounded-full border border-border/70 bg-background px-3 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-50 dark:hover:bg-red-950/30"
+                    className="inline-flex items-center gap-1 rounded-full border border-border/70 bg-background px-3 py-1.5 text-xs font-medium transition hover:bg-secondary"
                   >
                     <Trash2 className="h-3.5 w-3.5" /> Delete
                   </button>
