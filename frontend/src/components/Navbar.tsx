@@ -11,12 +11,14 @@ export function Navbar() {
   // Check if the current route is exactly the landing page
   const isLandingPage = location.pathname === "/";
 
-  // Check authentication status on mount and when localStorage changes
+  // Check authentication status by verifying the presence of a valid token
+  const checkAuth = () => {
+    const token = localStorage.getItem("truthlens_token");
+    // For now, just check if token exists. You can add token expiration logic later.
+    setIsLoggedIn(!!token);
+  };
+
   useEffect(() => {
-    const checkAuth = () => {
-      const auth = localStorage.getItem("truthlens_auth") === "true";
-      setIsLoggedIn(auth);
-    };
     checkAuth();
 
     // Listen for storage events (in case logout happens in another tab)
@@ -25,7 +27,8 @@ export function Navbar() {
   }, []);
 
   const handleLogout = () => {
-    localStorage.removeItem("truthlens_auth");
+    // Remove both token and user data
+    localStorage.removeItem("truthlens_token");
     localStorage.removeItem("truthlens_user");
     setIsLoggedIn(false);
     navigate({ to: "/" });

@@ -24,22 +24,39 @@ function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Basic client-side validation
+    if (!email.trim() || !password.trim()) {
+      setError("Please fill in all fields");
+      return;
+    }
+
     setIsLoading(true);
     setError("");
 
     try {
-      if (!email.trim() || !password.trim()) {
-        throw new Error("Please fill in all fields");
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Invalid email or password");
       }
-      
-      await new Promise((resolve) => setTimeout(resolve, 800));
-      
-      localStorage.setItem("truthlens_auth", "true");
-      localStorage.setItem("truthlens_user", email);
-      
+
+      // Store auth data
+      localStorage.setItem("truthlens_token", data.token);
+      localStorage.setItem("truthlens_user", JSON.stringify(data.user));
+
+      // Redirect to detect page (or dashboard)
       navigate({ to: "/detect" });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Login failed. Please try again.");
+    } catch (err: any) {
+      setError(err.message || "Login failed. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -51,7 +68,7 @@ function LoginPage() {
         <div className="flex flex-col justify-center bg-[#f4f6ff] px-6 py-12 pt-100 sm:px-12">
           <div className="mb-20">
             <div className="absolute top-50 left-25">
-              <img src="/public\images/logo.svg" alt="NeoCloud" className="h-10 w-auto" />
+              <img src="/images/logo.svg" alt="TruthLens" className="h-10 w-auto" />
             </div>
           </div>
           <h1 className="text-3xl font-bold sm:text-4xl">
@@ -67,7 +84,9 @@ function LoginPage() {
         <div className="flex flex-col justify-center px-6 py-12 sm:px-12">
           <div className="mx-auto w-full max-w-sm">
             <h2 className="text-2xl font-bold">Sign in</h2>
-            <p className="mt-1 text-xs text-muted-foreground">Use your TruthLens credentials.</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Use your TruthLens credentials.
+            </p>
 
             {error && (
               <div className="mt-4 rounded-md bg-red-100 p-3 text-xs text-red-700 dark:bg-red-900/30 dark:text-red-400">
@@ -77,7 +96,9 @@ function LoginPage() {
 
             <form onSubmit={handleSubmit} className="mt-6 space-y-4">
               <div>
-                <label className="text-xs font-medium text-foreground/80">Email</label>
+                <label className="text-xs font-medium text-foreground/80">
+                  Email
+                </label>
                 <div className="relative mt-1">
                   <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <input
@@ -90,9 +111,11 @@ function LoginPage() {
                   />
                 </div>
               </div>
-              
+
               <div>
-                <label className="text-xs font-medium text-foreground/80">Password</label>
+                <label className="text-xs font-medium text-foreground/80">
+                  Password
+                </label>
                 <div className="relative mt-1">
                   <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <input
@@ -105,14 +128,21 @@ function LoginPage() {
                   />
                 </div>
               </div>
-              
+
               <div className="flex items-center justify-between text-xs">
                 <label className="inline-flex items-center gap-2 text-muted-foreground">
                   <input type="checkbox" className="rounded border-input" /> Remember me
                 </label>
-                <a href="#" className="text-primary hover:underline">Forgot Password?</a>
+                {/* Forgot Password - placeholder, does nothing for now */}
+                <button
+                  type="button"
+                  onClick={(e) => e.preventDefault()}
+                  className="text-primary hover:underline cursor-pointer"
+                >
+                  Forgot Password?
+                </button>
               </div>
-              
+
               <button
                 type="submit"
                 disabled={isLoading}
@@ -124,7 +154,9 @@ function LoginPage() {
 
             <p className="mt-6 text-center text-xs text-muted-foreground">
               Don't have an account?{" "}
-              <Link to="/register" className="text-primary hover:underline">Register</Link>
+              <Link to="/register" className="text-primary hover:underline">
+                Register
+              </Link>
             </p>
           </div>
         </div>
