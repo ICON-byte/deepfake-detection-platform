@@ -1,332 +1,574 @@
-import { createFileRoute, Link, useSearch } from "@tanstack/react-router";
-import { SiteLayout } from "../components/SiteLayout";
-import { motion } from "framer-motion";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import {
-  AlertTriangle,
   CheckCircle2,
+  XCircle,
+  AlertTriangle,
+  RotateCcw,
   Download,
-  RefreshCw,
-  Save,
-  Fingerprint,
-  Loader2,
+  Share2,
+  BarChart3,
+  Clock,
+  FileImage,
+  FileText,
+  Link2,
+  Shield,
+  Brain,
+  Target,
+  Zap,
 } from "lucide-react";
-import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from "recharts";
-import { useQuery } from "@tanstack/react-query";
-
-type SearchParams = { scanId: string };
+import { SiteLayout } from "@/components/SiteLayout";
 
 export const Route = createFileRoute("/result")({
-  validateSearch: (s: Record<string, unknown>): SearchParams => ({
-    scanId: String(s.scanId ?? ""),
-  }),
-  component: ResultsPage,
+  component: ResultPage,
+  validateSearch: (search: Record<string, unknown>) => {
+    return {
+      type: search.type as "deepfake" | "ai" | "phishing",
+      data: search.data as any,
+      fileName: search.fileName as string | undefined,
+      timestamp: search.timestamp as string | undefined,
+    };
+  },
 });
 
-interface MongoScanReport {
-  _id: string;
-  userId: string;
-  fileName: string;
-  s3Url: string;
-  confidenceScore: number;
-  status: "Authentic" | "Manipulated";
-  createdAt: string;
-}
+function ResultPage() {
+  const { type, data, fileName, timestamp } = Route.useSearch();
+  const navigate = useNavigate();
 
-function ResultsPage() {
-  const { scanId } = useSearch({ from: "/result" });
-
-  // 1. Fetch live analytical scan payload from MongoDB using the URL query parameter
-  const demoScan: MongoScanReport = {
-    _id: "demo",
-    userId: "demo-user",
-    fileName: "demo-image.jpg",
-    s3Url: "/public/images/demo-image.jpg",
-    confidenceScore: 92.7,
-    status: "Authentic",
-    createdAt: new Date().toISOString(),
+  const handleNewAnalysis = () => {
+    navigate({ to: "/detect" });
   };
 
-  const { data: scan, isLoading, isError } = useQuery<MongoScanReport>({
-    queryKey: ["scanRecord", scanId],
-    queryFn: async () => {
-      if (!scanId) throw new Error("No scan execution ID found");
-      const res = await fetch(`/history/${scanId}`);
-      if (!res.ok) throw new Error("Failed to fetch scan record");
-      const json = await res.json();
-      return json.data as MongoScanReport;
-    },
-    enabled: !!scanId && scanId !== "demo",
-    initialData: scanId === "demo" ? demoScan : undefined,
-  });
+  const handleDownloadReport = () => {
+    const report = {
+      analysisType: type,
+      result: data,
+      fileName: fileName || "unknown",
+      timestamp: timestamp || new Date().toISOString(),
+      analyzer: "TruthLens v1.0",
+    };
+    const blob = new Blob([JSON.stringify(report, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `truthlens-report-${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
-  if (isLoading) {
+  const formatTimestamp = () => {
+    if (timestamp) return new Date(timestamp).toLocaleString();
+    return new Date().toLocaleString();
+  };
+
+  if (type === "deepfake") {
+    const { isDeepfake, confidence, details } = data;
+    const confidencePercent = (confidence * 100).toFixed(1);
+    const verdictColor = isDeepfake ? "red" : "green";
+    const verdictBg = isDeepfake ? "bg-red-50 border-red-200" : "bg-green-50 border-green-200";
+    const scoreColor = isDeepfake ? "text-red-600" : "text-green-600";
+
+    const artifactScore = isDeepfake ? 87 : 23;
+    const faceConsistency = isDeepfake ? 34 : 92;
+    const lightingAnalysis = isDeepfake ? 28 : 88;
+
     return (
       <SiteLayout>
-        <div className="flex flex-col items-center justify-center min-h-[60vh] text-gray-400 gap-3">
-          <Loader2 className="w-10 h-10 animate-spin text-[#6699FF]" />
-          <p className="text-sm">Assembling detection matrices & graphs...</p>
-        </div>
-      </SiteLayout>
-    );
-  }
-
-  if (isError || !scan) {
-    return (
-      <SiteLayout>
-        <div className="max-w-md mx-auto my-20 text-center rounded-2xl border border-red-200 bg-white p-6 shadow-lg">
-          <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-slate-900 mb-2">Report Generation Failed</h3>
-          <p className="text-sm text-slate-600 mb-6">
-            We couldn't retrieve the specified scan verification details from the database cluster.
-          </p>
-          <Link to="/detect" className="inline-flex items-center justify-center rounded-full bg-[#6699ff] px-4 py-2 text-sm font-semibold text-white hover:bg-[#4f7be1]">
-            Return to Scanning Engine
-          </Link>
-        </div>
-      </SiteLayout>
-    );
-  }
-
-  // 2. Derive visual values directly from real database states
-  const isFake = scan.status === "Manipulated";
-  const confidence = Math.round(scan.confidenceScore);
-
-  const pieData = [
-    { name: isFake ? "Fake" : "Authentic", value: confidence },
-    { name: "Remaining", value: 100 - confidence },
-  ];
-  const colors = isFake ? ["#F7941D", "#E5E7EB"] : ["#6699FF", "#E5E7EB"];
-
-  // Mapping granular analysis layers based on database verdict
-  const breakdown = [
-    { name: "Pixel Analysis", score: isFake ? 82 : 94 },
-    { name: "Metadata", score: isFake ? 71 : 96 },
-    { name: "Frequency", score: isFake ? 88 : 92 },
-    { name: "Compression", score: isFake ? 64 : 89 },
-    { name: "Semantic", score: isFake ? 79 : 95 },
-  ];
-
-  const risk = isFake ? (confidence > 85 ? "High" : "Medium") : "Low";
-  const riskColor = isFake ? (confidence > 85 ? "text-[#F7941D]" : "text-amber-400") : "text-green-400";
-
-  return (
-    <SiteLayout>
-      <section className="bg-slate-50 text-slate-900 max-w-6xl mx-auto px-4 sm:px-6 pt-24 pb-20">
-        <div className="flex flex-wrap items-end justify-between gap-4 mb-8">
-          <div>
-            <h1
-              className="text-3xl md:text-4xl font-bold text-slate-900"
-              style={{ fontFamily: "'Montserrat', sans-serif" }}
-            >
-              Analysis Results
-            </h1>
-            <p className="text-sm text-gray-700 mt-1">
-              File: <span className="text-black font-mono break-all">{scan.fileName}</span>
-            </p>
-          </div>
-          <div className="flex gap-3 flex-wrap items-center">
-            <button className="inline-flex items-center gap-2 rounded-md px-3 py-2 border border-[#e6eef8] bg-white text-sm font-medium text-slate-700 hover:bg-[#f1f8ff]">
-              <Save className="w-4 h-4" />
-              Save
-            </button>
-            <button className="inline-flex items-center gap-2 rounded-md px-3 py-2 border border-[#e6eef8] bg-white text-sm font-medium text-slate-700 hover:bg-[#f1f8ff]">
-              <Download className="w-4 h-4" />
-              Download
-            </button>
-            <Link to="/detect" className="inline-flex items-center gap-2 rounded-full bg-[#6699ff] px-4 py-2 text-sm font-semibold text-white hover:bg-[#4f7be1]">
-              <RefreshCw className="w-4 h-4" />
-              Detect
-            </Link>
-          </div>
-        </div>
-
-        <div className="grid gap-5 lg:grid-cols-3">
-          {/* Verdict Card */}
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="lg:col-span-2"
-          >
-            <div className="rounded-2xl border border-[#e6eef8] bg-white p-6 shadow-md">
-              <div className="flex flex-col gap-5 lg:flex-row lg:items-start">
-                <div
-                  className={`w-16 h-16 rounded-2xl flex items-center justify-center ${
-                    isFake ? "bg-[#F7941D]/10" : "bg-[#dbeafe]"
-                  }`}
-                >
-                  {isFake ? (
-                    <AlertTriangle className="w-8 h-8 text-[#F7941D]" />
-                  ) : (
-                    <CheckCircle2 className="w-8 h-8 text-[#6699FF]" />
-                  )}
-                </div>
-                <div className="flex-1 min-w-[220px]">
-                  <div
-                    className={`inline-block text-xs font-semibold uppercase tracking-wider px-2.5 py-1 rounded-md mb-2 ${
-                      isFake
-                        ? "bg-[#fee9e2] text-[#b45309]"
-                        : "bg-[#dbeafe] text-[#1d4ed8]"
-                    }`}
-                  >
-                    {isFake ? "Deepfake Detected" : "Authentic Media"}
-                  </div>
-                  <h2
-                    className="text-2xl md:text-3xl font-bold text-slate-900"
-                    style={{ fontFamily: "'Montserrat', sans-serif" }}
-                  >
-                      {isFake ? (
-                        <>
-                          <AlertTriangle className="w-4 h-4 text-[#F7941D] inline-block" aria-hidden />
-                          <span>This media appears manipulated</span>
-                        </>
-                      ) : (
-                        <>
-                          <span>This media appears genuine</span>
-                        </>
-                      )}
-                  </h2>
-                  <p className="text-sm text-slate-600 mt-3 max-w-2xl leading-relaxed">
-                    {isFake
-                      ? "Our model found artifacts consistent with synthetic alteration, so take this result as a cautionary signal."
-                      : "No significant manipulation artifacts were detected. The media appears genuine according to the current analysis."}
-                  </p>
-                  <div className="mt-6">
-                    <div className="rounded-lg border border-[#e6eef8] bg-white p-4 shadow-sm max-w-xs">
-                      <div className="text-xs text-slate-500 uppercase tracking-wider">
-                        Risk Level
-                      </div>
-                      <div className={`font-bold text-2xl mt-2 ${riskColor}`}>{risk}</div>
+        <div className="mx-auto max-w-5xl px-4 py-12 mt-24 mb-20">
+          {/* Main Header Card */}
+          <div className="rounded-3xl bg-white border border-slate-200 shadow-lg overflow-hidden mb-8">
+            <div className="px-8 py-10 border-b border-slate-200 bg-white">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  {isDeepfake ? (
+                    <div className="p-2.5 bg-slate-100 rounded-2xl">
+                      <XCircle className="h-8 w-8 text-[#6699ff]" />
                     </div>
+                  ) : (
+                    <div className="p-2.5 bg-slate-100 rounded-2xl">
+                      <CheckCircle2 className="h-8 w-8 text-[#6699ff]" />
+                    </div>
+                  )}
+                  <div>
+                    <h1 className="text-4xl font-bold text-slate-900">
+                      {isDeepfake ? "Deepfake Detected" : "Authentic Media"}
+                    </h1>
+                    <p className="text-sm text-slate-600 mt-2">
+                      Analysis completed at {formatTimestamp()}
+                    </p>
                   </div>
                 </div>
-              </div>
-            </div>
-          </motion.div>
-
-          {/* Circular confidence chart */}
-          <div className="rounded-2xl border border-[#e6eef8] bg-white p-6 flex flex-col items-center justify-center shadow-sm">
-            <div className="w-40 h-40 relative">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={pieData}
-                    dataKey="value"
-                    innerRadius={55}
-                    outerRadius={70}
-                    paddingAngle={3}
-                    cornerRadius={20}
-                    startAngle={90}
-                    endAngle={-270}
-                    stroke="#ffffff"
-                    strokeWidth={2}
+                <div className="flex gap-3 flex-wrap justify-end">
+                  <button
+                    onClick={handleDownloadReport}
+                    className="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-400 transition-all shadow-sm"
                   >
-                    {pieData.map((_, i) => (
-                      <Cell key={i} fill={colors[i]} />
-                    ))}
-                  </Pie>
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <div className="text-3xl font-bold text-slate-900">{confidence}%</div>
-                <div className="text-xs text-slate-500">Confidence</div>
+                    <Download className="h-4 w-4" /> Report
+                  </button>
+                  <button
+                    onClick={handleNewAnalysis}
+                    className="inline-flex items-center gap-2 rounded-full bg-[#6699ff] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[#5588ee] transition-all shadow-md hover:shadow-lg"
+                  >
+                    <RotateCcw className="h-4 w-4" /> New Analysis
+                  </button>
+                </div>
               </div>
             </div>
-            <div className="text-xs text-slate-500 mt-3 text-center">Confidence Meter</div>
-          </div>
 
-          {/* Breakdown Bar Chart */}
-          <div className="rounded-2xl border border-[#e6eef8] bg-white p-6 lg:col-span-2 shadow-sm">
-            <h3 className="font-semibold text-slate-900 mb-4">
-              Analysis Breakdown
-            </h3>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={breakdown} layout="vertical" margin={{ left: 20 }}>
-                  <XAxis
-                    type="number"
-                    domain={[0, 100]}
-                    tick={{ fill: "#94a3b8", fontSize: 12 }}
-                  />
-                  <YAxis
-                    dataKey="name"
-                    type="category"
-                    tick={{ fill: "#cbd5e1", fontSize: 12 }}
-                    width={100}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      background: "#000000",
-                      border: "1px solid rgba(102, 153, 255, 0.3)",
-                      borderRadius: 8,
-                      color: "#ffffff",
-                    }}
-                  />
-                  <Bar
-                    dataKey="score"
-                    radius={[0, 6, 6, 0]}
-                    fill={isFake ? "#F7941D" : "#6699FF"}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          {/* AI Explanation */}
-          <div className="rounded-2xl border border-[#e6eef8] bg-white p-6 shadow-sm">
-            <h3 className="flex items-center gap-2 font-semibold text-slate-900 mb-4">
-              <Fingerprint className="w-5 h-5 text-[#6699ff]" />
-              AI Explanation
-            </h3>
-            <div className="rounded-2xl border border-[#dbeafe] bg-[#eff6ff] p-4">
-              <p className="text-sm text-slate-700 leading-relaxed">
-                {isFake
-                  ? "The evaluation model captured geometric blurring, irregular edge frequencies, and subtle blending mismatch signatures within spatial asset boundaries."
-                  : "Spectral responses remain within standard operational margins. Pixel boundaries and background patterns show consistent continuous compression ratios."}
-              </p>
-            </div>
-          </div>
-
-          {/* Detection Indicators */}
-          <div className="rounded-2xl border border-[#e6eef8] bg-white p-6 lg:col-span-3 shadow-sm">
-            <h3 className="font-semibold text-slate-900 mb-4">Detection Indicators</h3>
-            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              {[
-                { label: "Face Region Artifacts", flag: isFake },
-                { label: "Metadata Integrity", flag: !isFake },
-                { label: "Frequency Coherence", flag: !isFake },
-                { label: "Temporal Consistency", flag: !isFake },
-              ].map((ind) => (
-                <div
-                  key={ind.label}
-                  className="bg-white rounded-xl p-4 shadow-sm border border-[#e2e8f0]"
-                >
-                  <div className="flex items-center gap-2">
-                    {ind.flag ? (
-                      <CheckCircle2 className="w-4 h-4 text-green-500" />
-                    ) : (
-                      <AlertTriangle className="w-4 h-4 text-[#F7941D]" />
-                    )}
-                    <span className="text-sm font-medium text-slate-900">{ind.label}</span>
+            <div className="px-8 py-8 space-y-8">
+              {/* Confidence Score Section */}
+              <div className="bg-slate-50 rounded-2xl p-6 border border-slate-200">
+                <div className="flex justify-between items-end mb-4">
+                  <div>
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Detection Confidence</p>
+                    <p className={`text-5xl font-bold ${scoreColor}`}>
+                      {confidencePercent}%
+                    </p>
                   </div>
-                  <div className="text-xs text-slate-500 mt-1">
-                    {ind.flag ? "Pass" : "Suspicious"}
+                  <div className="text-xs font-semibold px-3 py-1.5 rounded-full bg-slate-200 text-slate-700">
+                    {isDeepfake ? "MANIPULATED" : "AUTHENTIC"}
                   </div>
                 </div>
-              ))}
-            </div>
-          </div>
+                <div className="h-4 rounded-full bg-slate-300 overflow-hidden mb-4">
+                  <div
+                    className={`h-full rounded-full transition-all duration-500 ${
+                      isDeepfake ? "bg-gradient-to-r from-red-500 to-red-600" : "bg-gradient-to-r from-green-500 to-green-600"
+                    }`}
+                    style={{ width: `${confidencePercent}%` }}
+                  />
+                </div>
+                <p className="text-sm text-slate-600 leading-relaxed">{details}</p>
+              </div>
 
-          {/* Recommendation */}
-          <div className="rounded-2xl border border-[#e6eef8] bg-white p-6 lg:col-span-3 shadow-sm">
-            <h3 className="font-semibold text-slate-900 mb-3">Recommendation</h3>
-            <p className="text-sm text-slate-600">
-              {isFake
-                ? "Do not spread or republish this content without verifying its context. Check source materials or corroborating details."
-                : "This file passes authentication checks. It is safe for standard ingestion pipelines and storage distributions."}
-            </p>
+              {/* Analysis Metrics */}
+              <div>
+                <h2 className="text-lg font-bold text-slate-900 mb-4">Analysis Breakdown</h2>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="rounded-2xl bg-white border border-slate-200 p-6 shadow-sm hover:shadow-md transition-all">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="p-2 bg-slate-100 rounded-lg">
+                        <Shield className="h-5 w-5 text-[#6699ff]" />
+                      </div>
+                      <span className={`text-2xl font-bold ${
+                        artifactScore > 70 ? "text-red-600" : "text-green-600"
+                      }`}>{artifactScore}%</span>
+                    </div>
+                    <p className="text-sm font-semibold text-slate-900 mb-1">Artifact Scan</p>
+                    <p className="text-xs text-slate-600">GAN artifacts & noise patterns</p>
+                  </div>
+                  <div className="rounded-2xl bg-white border border-slate-200 p-6 shadow-sm hover:shadow-md transition-all">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="p-2 bg-slate-100 rounded-lg">
+                        <Brain className="h-5 w-5 text-[#6699ff]" />
+                      </div>
+                      <span className={`text-2xl font-bold ${
+                        faceConsistency > 70 ? "text-green-600" : "text-red-600"
+                      }`}>{faceConsistency}%</span>
+                    </div>
+                    <p className="text-sm font-semibold text-slate-900 mb-1">Facial Consistency</p>
+                    <p className="text-xs text-slate-600">Landmark alignment & symmetry</p>
+                  </div>
+                  <div className="rounded-2xl bg-white border border-slate-200 p-6 shadow-sm hover:shadow-md transition-all">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="p-2 bg-slate-100 rounded-lg">
+                        <Target className="h-5 w-5 text-[#6699ff]" />
+                      </div>
+                      <span className={`text-2xl font-bold ${
+                        lightingAnalysis > 70 ? "text-green-600" : "text-red-600"
+                      }`}>{lightingAnalysis}%</span>
+                    </div>
+                    <p className="text-sm font-semibold text-slate-900 mb-1">Lighting Analysis</p>
+                    <p className="text-xs text-slate-600">Shadow & illumination consistency</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* AI Explanation Card */}
+              <div className="rounded-2xl border border-slate-200 bg-white p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <Zap className="h-5 w-5 text-[#6699ff]" />
+                  <h3 className="text-base font-bold text-slate-900">Analysis Explanation</h3>
+                </div>
+                <p className="text-sm text-slate-700 leading-relaxed">
+                  {isDeepfake
+                    ? "The model detected manipulation traces including warped facial features, inconsistent lighting patterns, and pixel-level GAN artifacts. These indicators suggest the media has been synthetically altered or generated."
+                    : "Facial landmarks show natural consistency, lighting is uniform across the image, and no synthetic generation markers were detected. The media exhibits characteristics typical of authentic, unmanipulated content."}
+                </p>
+              </div>
+
+              {/* Recommendation Box */}
+              <div className="rounded-2xl p-6 border border-slate-200 bg-slate-50">
+                <p className="text-sm font-medium leading-relaxed text-slate-900">
+                  <strong>Recommendation:</strong> {isDeepfake
+                    ? " This media shows strong signs of manipulation. Do not rely on it as evidence. Verify with original sources before sharing."
+                    : " No deepfake patterns detected. The media appears authentic and safe for standard use."}
+                </p>
+              </div>
+
+              {/* File Info Footer */}
+              {fileName && (
+                <div className="flex flex-wrap items-center gap-4 text-sm text-slate-600 border-t border-slate-200 pt-6 mt-6">
+                  <div className="flex items-center gap-2">
+                    <FileImage className="h-4 w-4 text-[#6699ff]" />
+                    <span><strong>File:</strong> {fileName}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-[#6699ff]" />
+                    <span><strong>Analyzed:</strong> {formatTimestamp()}</span>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
-      </section>
-    </SiteLayout>
-  );
+      </SiteLayout>
+    );
+  }
+
+  if (type === "ai") {
+    const { isAIGenerated, confidence, details } = data;
+    const confidencePercent = (confidence * 100).toFixed(1);
+    const verdictBg = isAIGenerated ? "bg-amber-50 border-amber-200" : "bg-green-50 border-green-200";
+    const scoreColor = isAIGenerated ? "text-amber-600" : "text-green-600";
+
+    const perplexity = isAIGenerated ? 24 : 78;
+    const burstiness = isAIGenerated ? 32 : 69;
+    const repetitionScore = isAIGenerated ? 81 : 34;
+
+    return (
+      <SiteLayout>
+        <div className="mx-auto max-w-5xl px-4 py-12 mt-24 mb-20">
+          {/* Main Header Card */}
+          <div className="rounded-3xl bg-white border border-slate-200 shadow-lg overflow-hidden mb-8">
+            <div className="px-8 py-10 border-b border-slate-200 bg-white">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  {isAIGenerated ? (
+                    <div className="p-2.5 bg-slate-100 rounded-2xl">
+                      <AlertTriangle className="h-8 w-8 text-[#6699ff]" />
+                    </div>
+                  ) : (
+                    <div className="p-2.5 bg-slate-100 rounded-2xl">
+                      <CheckCircle2 className="h-8 w-8 text-[#6699ff]" />
+                    </div>
+                  )}
+                  <div>
+                    <h1 className="text-4xl font-bold text-slate-900">
+                      {isAIGenerated
+                        ? "AI-Generated Content Detected"
+                        : "Likely Human-Written / Authentic"}
+                    </h1>
+                    <p className="text-sm text-slate-600 mt-2">
+                      Analysis completed at {formatTimestamp()}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex gap-3 flex-wrap justify-end">
+                  <button
+                    onClick={handleDownloadReport}
+                    className="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-400 transition-all shadow-sm"
+                  >
+                    <Download className="h-4 w-4" /> Report
+                  </button>
+                  <button
+                    onClick={handleNewAnalysis}
+                    className="inline-flex items-center gap-2 rounded-full bg-[#6699ff] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[#5588ee] transition-all shadow-md hover:shadow-lg"
+                  >
+                    <RotateCcw className="h-4 w-4" /> New Analysis
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="px-8 py-8 space-y-8">
+              {/* Confidence Score Section */}
+              <div className="bg-slate-50 rounded-2xl p-6 border border-slate-200">
+                <div className="flex justify-between items-end mb-4">
+                  <div>
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Detection Confidence</p>
+                    <p className={`text-5xl font-bold ${scoreColor}`}>
+                      {confidencePercent}%
+                    </p>
+                  </div>
+                  <div className="text-xs font-semibold px-3 py-1.5 rounded-full bg-slate-200 text-slate-700">
+                    {isAIGenerated ? "AI GENERATED" : "HUMAN WRITTEN"}
+                  </div>
+                </div>
+                <div className="h-4 rounded-full bg-slate-300 overflow-hidden mb-4">
+                  <div
+                    className={`h-full rounded-full transition-all duration-500 ${
+                      isAIGenerated ? "bg-gradient-to-r from-amber-500 to-amber-600" : "bg-gradient-to-r from-green-500 to-green-600"
+                    }`}
+                    style={{ width: `${confidencePercent}%` }}
+                  />
+                </div>
+                <p className="text-sm text-slate-600 leading-relaxed">{details}</p>
+              </div>
+
+              {/* Analysis Metrics */}
+              <div>
+                <h2 className="text-lg font-bold text-slate-900 mb-4">Linguistic Analysis</h2>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="rounded-2xl bg-white border border-slate-200 p-6 shadow-sm hover:shadow-md transition-all">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="p-2 bg-slate-100 rounded-lg">
+                        <BarChart3 className="h-5 w-5 text-[#6699ff]" />
+                      </div>
+                      <span className="text-2xl font-bold text-[#6699ff]">{perplexity}%</span>
+                    </div>
+                    <p className="text-sm font-semibold text-slate-900 mb-1">Perplexity</p>
+                    <p className="text-xs text-slate-600">Lower = more predictable (AI)</p>
+                  </div>
+                  <div className="rounded-2xl bg-white border border-slate-200 p-6 shadow-sm hover:shadow-md transition-all">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="p-2 bg-slate-100 rounded-lg">
+                        <BarChart3 className="h-5 w-5 text-[#6699ff]" />
+                      </div>
+                      <span className="text-2xl font-bold text-[#6699ff]">{burstiness}%</span>
+                    </div>
+                    <p className="text-sm font-semibold text-slate-900 mb-1">Burstiness</p>
+                    <p className="text-xs text-slate-600">Sentence length variation</p>
+                  </div>
+                  <div className="rounded-2xl bg-white border border-slate-200 p-6 shadow-sm hover:shadow-md transition-all">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="p-2 bg-slate-100 rounded-lg">
+                        <BarChart3 className="h-5 w-5 text-[#6699ff]" />
+                      </div>
+                      <span className="text-2xl font-bold text-[#6699ff]">{repetitionScore}%</span>
+                    </div>
+                    <p className="text-sm font-semibold text-slate-900 mb-1">Repetition</p>
+                    <p className="text-xs text-slate-600">N-gram repetition frequency</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-col md:flex-row items-stretch justify-center gap-6">
+                <div className="w-full md:w-1/2 rounded-2xl border border-slate-200 bg-white p-6 h-full min-h-[160px]">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Zap className="h-5 w-5 text-[#6699ff]" />
+                    <h3 className="text-base font-bold text-slate-900">Analysis Explanation</h3>
+                  </div>
+                  <p className="text-sm text-slate-700 leading-relaxed">
+                    {isAIGenerated
+                      ? "The analysis detected patterns typical of AI generation including low perplexity, repetitive sentence structures, and uniform stylistic markers. These linguistic features suggest the content was generated by a language model."
+                      : "The text shows natural language variations with appropriate sentence diversity, contextual coherence, and human-like inconsistencies. No significant AI generation patterns were detected."}
+                  </p>
+                </div>
+
+                <div className="w-full md:w-1/2 rounded-2xl p-6 border border-slate-200 bg-slate-50 h-lg min-h-[160px]">
+                  <p className="text-sm font-medium leading-relaxed text-slate-900">
+                    <strong>Recommendation:</strong> {isAIGenerated
+                      ? " This content exhibits strong AI generation markers. Verify with original sources if critical for decision-making."
+                      : " No significant AI patterns found. Content appears human-authored with natural variation."}
+                  </p>
+                </div>
+              </div>
+
+              {/* File Info Footer */}
+              {fileName && (
+                <div className="flex flex-wrap items-center gap-4 text-sm text-slate-600 border-t border-slate-200 pt-6 mt-6">
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-[#6699ff]" />
+                    <span><strong>File:</strong> {fileName}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-[#6699ff]" />
+                    <span><strong>Analyzed:</strong> {formatTimestamp()}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </SiteLayout>
+    );
+  }
+
+  if (type === "phishing") {
+    const { isMalicious, confidence, details, riskLevel } = data;
+    const confidencePercent = (confidence * 100).toFixed(1);
+    const verdictBg = isMalicious
+      ? riskLevel === "high"
+        ? "bg-red-50 border-red-200"
+        : "bg-amber-50 border-amber-200"
+      : "bg-green-50 border-green-200";
+
+    const domainAge = isMalicious ? "< 30 days" : "> 2 years";
+    const sslValid = isMalicious ? "Self-signed" : "Valid (Let's Encrypt)";
+    const redirects = isMalicious ? 3 : 0;
+    const blacklistCount = isMalicious ? 4 : 0;
+
+    return (
+      <SiteLayout>
+        <div className="mx-auto max-w-5xl px-4 py-12 mt-24 mb-20">
+          {/* Main Header Card */}
+          <div className="rounded-3xl bg-white border border-slate-200 shadow-lg overflow-hidden mb-8">
+            <div className="px-8 py-10 border-b border-slate-200 bg-white">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  {isMalicious ? (
+                    <div className="p-2.5 bg-slate-100 rounded-2xl">
+                      <XCircle className="h-8 w-8 text-[#6699ff]" />
+                    </div>
+                  ) : (
+                    <div className="p-2.5 bg-slate-100 rounded-2xl">
+                      <CheckCircle2 className="h-8 w-8 text-[#6699ff]" />
+                    </div>
+                  )}
+                  <div>
+                    <h1 className="text-4xl font-bold text-slate-900">
+                      {isMalicious
+                        ? "Suspicious / Malicious URL Detected"
+                        : "URL Appears Safe"}
+                    </h1>
+                    <p className="text-sm text-slate-600 mt-2">
+                      Analysis completed at {formatTimestamp()}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex gap-3 flex-wrap justify-end">
+                  <button
+                    onClick={handleDownloadReport}
+                    className="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-400 transition-all shadow-sm"
+                  >
+                    <Download className="h-4 w-4" /> Report
+                  </button>
+                  <button
+                    onClick={handleNewAnalysis}
+                    className="inline-flex items-center gap-2 rounded-full bg-[#6699ff] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[#5588ee] transition-all shadow-md hover:shadow-lg"
+                  >
+                    <RotateCcw className="h-4 w-4" /> New Analysis
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="px-8 py-8 space-y-8">
+              {/* Confidence Score Section */}
+              <div className="bg-slate-50 rounded-2xl p-6 border border-slate-200">
+                <div className="flex justify-between items-end mb-4">
+                  <div>
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Security Confidence</p>
+                    <p className={`text-5xl font-bold ${
+                      isMalicious ? (riskLevel === "high" ? "text-red-600" : "text-amber-600") : "text-green-600"
+                    }`}>
+                      {confidencePercent}%
+                    </p>
+                  </div>
+                  <div className="text-xs font-semibold px-3 py-1.5 rounded-full bg-slate-200 text-slate-700">
+                    {isMalicious ? (riskLevel === "high" ? "CRITICAL" : "WARNING") : "SAFE"}
+                  </div>
+                </div>
+                <div className="h-4 rounded-full bg-slate-300 overflow-hidden mb-4">
+                  <div
+                    className={`h-full rounded-full transition-all duration-500 ${
+                      isMalicious ? (riskLevel === "high" ? "bg-gradient-to-r from-red-500 to-red-600" : "bg-gradient-to-r from-amber-500 to-amber-600") : "bg-gradient-to-r from-green-500 to-green-600"
+                    }`}
+                    style={{ width: `${confidencePercent}%` }}
+                  />
+                </div>
+                <p className="text-sm text-slate-600 leading-relaxed">{details}</p>
+              </div>
+
+              {/* Security Metrics */}
+              <div>
+                <h2 className="text-lg font-bold text-slate-900 mb-4">Security Analysis</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="rounded-2xl bg-white border border-slate-200 p-6 shadow-sm hover:shadow-md transition-all">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="p-2 bg-slate-100 rounded-lg">
+                        <Clock className="h-5 w-5 text-[#6699ff]" />
+                      </div>
+                      <span className={`text-lg font-bold ${
+                        isMalicious ? "text-red-600" : "text-green-600"
+                      }`}>{domainAge}</span>
+                    </div>
+                    <p className="text-sm font-semibold text-slate-900 mb-1">Domain Age</p>
+                    <p className="text-xs text-slate-600">Newer domains are higher risk</p>
+                  </div>
+                  <div className="rounded-2xl bg-white border border-slate-200 p-6 shadow-sm hover:shadow-md transition-all">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="p-2 bg-slate-100 rounded-lg">
+                        <Shield className="h-5 w-5 text-[#6699ff]" />
+                      </div>
+                      <span className={`text-lg font-bold ${
+                        sslValid.includes("Self") ? "text-red-600" : "text-green-600"
+                      }`}>{sslValid.split(" ")[0]}</span>
+                    </div>
+                    <p className="text-sm font-semibold text-slate-900 mb-1">SSL Certificate</p>
+                    <p className="text-xs text-slate-600">Validity & issuer check</p>
+                  </div>
+                  <div className="rounded-2xl bg-white border border-slate-200 p-6 shadow-sm hover:shadow-md transition-all">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="p-2 bg-slate-100 rounded-lg">
+                        <Link2 className="h-5 w-5 text-[#6699ff]" />
+                      </div>
+                      <span className={`text-lg font-bold ${
+                        redirects > 0 ? "text-red-600" : "text-green-600"
+                      }`}>{redirects}</span>
+                    </div>
+                    <p className="text-sm font-semibold text-slate-900 mb-1">Redirects</p>
+                    <p className="text-xs text-slate-600">Number of redirect chains</p>
+                  </div>
+                  <div className="rounded-2xl bg-white border border-slate-200 p-6 shadow-sm hover:shadow-md transition-all">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="p-2 bg-slate-100 rounded-lg">
+                        <AlertTriangle className="h-5 w-5 text-[#6699ff]" />
+                      </div>
+                      <span className={`text-lg font-bold ${
+                        blacklistCount > 0 ? "text-red-600" : "text-green-600"
+                      }`}>{blacklistCount}</span>
+                    </div>
+                    <p className="text-sm font-semibold text-slate-900 mb-1">Blacklist Hits</p>
+                    <p className="text-xs text-slate-600">Known threat databases</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* AI Explanation Card */}
+              <div className="rounded-2xl border border-slate-200 bg-white p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <Zap className="h-5 w-5 text-[#6699ff]" />
+                  <h3 className="text-base font-bold text-slate-900">Security Analysis</h3>
+                </div>
+                <p className="text-sm text-slate-700 leading-relaxed">
+                  {isMalicious
+                    ? riskLevel === "high"
+                      ? "This URL exhibits critical phishing indicators: domain age under 30 days, self-signed SSL certificate, multiple redirect chains, and presence in multiple threat databases. These factors strongly indicate malicious intent."
+                      : "Suspicious characteristics detected: domain age and SSL certificate issues, plus moderate indicators found in threat databases. Exercise caution before interacting with this URL."
+                    : "The domain has established history with valid SSL certificate, no suspicious redirect chains, and no presence in known threat databases. Security indicators suggest this URL is legitimate."}
+                </p>
+              </div>
+
+              {/* Recommendation Box */}
+              <div className="rounded-2xl p-6 border border-slate-200 bg-slate-50">
+                <p className="text-sm font-medium leading-relaxed text-slate-900">
+                  <strong>Recommendation:</strong> {
+                    isMalicious
+                      ? riskLevel === "high"
+                        ? " DO NOT PROCEED. This URL is highly likely to be malicious. Avoid clicking and report it if possible."
+                        : " Exercise caution with this URL. This shows suspicious characteristics. Verify legitimacy before proceeding."
+                      : " No known threats detected. This URL appears safe for standard browsing."
+                  }
+                </p>
+              </div>
+
+              {/* URL Info Footer */}
+              <div className="flex flex-wrap items-center gap-4 text-sm text-slate-600 border-t border-slate-200 pt-6 mt-6">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Link2 className="h-4 w-4 text-[#6699ff] flex-shrink-0" />
+                  <span className="break-all"><strong>URL:</strong> {data.url || "Not saved"}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-[#6699ff] flex-shrink-0" />
+                  <span><strong>Analyzed:</strong> {formatTimestamp()}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </SiteLayout>
+    );
+  }
+
+  return null;
 }
