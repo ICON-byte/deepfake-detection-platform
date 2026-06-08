@@ -1,4 +1,4 @@
-﻿import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { SiteLayout } from "@/components/SiteLayout";
 import {
   UploadCloud,
@@ -309,13 +309,13 @@ function DeepfakePanel({ onCheckLimit, onTrackScan, headers, onTriggerLimitModal
         { headers }
       );
 
-      const { uploadUrl, s3Key, fileUrl } = presignResponse.data;
+      const { presignedUrl, s3Key, fileUrl } = presignResponse.data;
 
       // Phase 2: Upload direct payload binary straight to the S3 bucket node
       setStatusMessage("Uploading asset securely to AWS S3 storage vault...");
       setProgress(25);
 
-      await axios.put(uploadUrl, file, {
+      await axios.put(presignedUrl, file, {
         headers: { "Content-Type": file.type },
         onUploadProgress: (progressEvent) => {
           if (progressEvent.total) {
@@ -339,23 +339,21 @@ function DeepfakePanel({ onCheckLimit, onTrackScan, headers, onTriggerLimitModal
       onTrackScan();
       setIsProcessing(false);
 
+      const report = analysisResponse.data.data;
+
       navigate({
         to: "/result",
         search: {
           type: "deepfake",
-<<<<<<< HEAD
-          data: analysisResponse.data.data,
-=======
           data: {
-            isDeepfake: result.data.status === "Manipulated",
-            confidence: result.data.confidenceScore / 100,
+            isDeepfake: report.status === "Manipulated",
+            confidence: report.confidenceScore / 100,
             details:
-              result.message ||
-              (result.data.status === "Manipulated"
+              analysisResponse.data.message ||
+              (report.status === "Manipulated"
                 ? "Multiple manipulation traces detected including inconsistent lighting and warped facial features."
                 : "No significant deepfake patterns found. Image appears authentic."),
           },
->>>>>>> ab0a51b2a747cdfdb274004d36bf1c6377bc2007
           fileName: file.name,
           timestamp: new Date().toISOString(),
         },
@@ -476,20 +474,13 @@ function AiPanel({ onCheckLimit, onTrackScan, headers, onTriggerLimitModal }: Pa
   }, [previewUrl]);
 
   const handleFileSelect = async (selectedFile: File | null) => {
-<<<<<<< HEAD
-    if (selectedFile && (selectedFile.type.startsWith("image/") || selectedFile.type === "text/plain")) {
-      if (onCheckLimit()) return;
-=======
     if (
       selectedFile &&
       (selectedFile.type.startsWith("image/") ||
         selectedFile.type.startsWith("video/") ||
         selectedFile.type === "text/plain")
     ) {
-      setIsUploading(true);
-      await new Promise((resolve) => setTimeout(resolve, 1200));
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
->>>>>>> ab0a51b2a747cdfdb274004d36bf1c6377bc2007
+      if (onCheckLimit()) return;
       setFile(selectedFile);
       if (selectedFile.type.startsWith("image/")) {
         if (previewUrl) URL.revokeObjectURL(previewUrl);
@@ -498,7 +489,7 @@ function AiPanel({ onCheckLimit, onTrackScan, headers, onTriggerLimitModal }: Pa
         setPreviewUrl(null);
       }
     } else if (selectedFile) {
-      alert("Please select an image or text file (.txt)");
+      alert("Please select an image, video, or text file (.txt)");
     }
   };
 
@@ -541,16 +532,16 @@ function AiPanel({ onCheckLimit, onTrackScan, headers, onTriggerLimitModal }: Pa
         
         const presignResponse = await axios.post(
           `${API_BASE_URL}/detection/request-upload`,
-          { fileName: file.name, fileType: file.type, mode: "text" },
+          { fileName: file.name, fileType: file.type, mode: file.type.startsWith("video/") ? "video" : "image" },
           { headers }
         );
 
-        const { uploadUrl, s3Key, fileUrl } = presignResponse.data;
+        const { presignedUrl, s3Key, fileUrl } = presignResponse.data;
 
         setStatusMessage("Streaming document payload to cloud servers...");
         setProgress(30);
 
-        await axios.put(uploadUrl, file, {
+        await axios.put(presignedUrl, file, {
           headers: { "Content-Type": file.type },
           onUploadProgress: (progressEvent) => {
             if (progressEvent.total) {
@@ -565,7 +556,12 @@ function AiPanel({ onCheckLimit, onTrackScan, headers, onTriggerLimitModal }: Pa
 
         const analysisResponse = await axios.post(
           `${API_BASE_URL}/detection/analyze`,
-          { fileUrl, s3Key, fileName: file.name, detectionMode: "text" },
+          { 
+            fileUrl, 
+            s3Key, 
+            fileName: file.name, 
+            detectionMode: file.type.startsWith("video/") ? "video" : "image" 
+          },
           { headers }
         );
 
@@ -573,23 +569,55 @@ function AiPanel({ onCheckLimit, onTrackScan, headers, onTriggerLimitModal }: Pa
         onTrackScan();
         setIsProcessing(false);
 
+        const report = analysisResponse.data.data;
+
         navigate({
           to: "/result",
           search: { 
             type: "ai", 
-            data: analysisResponse.data.data, 
+            data: {
+              isAIGenerated: report.status === "Manipulated",
+              confidence: report.confidenceScore / 100,
+              details: analysisResponse.data.message || (report.status === "Manipulated" 
+                ? "Synthetic artifacts detected consistent with AI generation." 
+                : "Likely human-created content."),
+            }, 
             fileName: file.name, 
             timestamp: new Date().toISOString() 
           }
         });
 
       } else if (mode === "text" && textContent.trim()) {
+        setStatusMessage("Processing text input...");
+        setProgress(10);
+
+        // Upload text to S3 as a file first, as backend analyze expects a pointer
+        const presignResponse = await axios.post(
+          `${API_BASE_URL}/detection/request-upload`,
+          { fileName: "text_input.txt", fileType: "text/plain", mode: "text" },
+          { headers }
+        );
+
+        const { presignedUrl, s3Key, fileUrl } = presignResponse.data;
+
+        setStatusMessage("Uploading text to secure vault...");
+        setProgress(30);
+
+        await axios.put(presignedUrl, textContent, {
+          headers: { "Content-Type": "text/plain" }
+        });
+
         setStatusMessage("Evaluating custom textual patterns...");
-        setProgress(40);
+        setProgress(70);
 
         const analysisResponse = await axios.post(
-          `${API_BASE_URL}/detection/analyze-text`,
-          { text: textContent },
+          `${API_BASE_URL}/detection/analyze`,
+          { 
+            fileUrl, 
+            s3Key, 
+            fileName: "text_input.txt", 
+            detectionMode: "text" 
+          },
           { headers }
         );
 
@@ -597,17 +625,24 @@ function AiPanel({ onCheckLimit, onTrackScan, headers, onTriggerLimitModal }: Pa
         onTrackScan();
         setIsProcessing(false);
 
+        const report = analysisResponse.data.data;
+
         navigate({
           to: "/result",
           search: { 
             type: "ai", 
-            data: analysisResponse.data.data, 
+            data: {
+              isAIGenerated: report.status === "Manipulated",
+              confidence: report.confidenceScore / 100,
+              details: analysisResponse.data.message || (report.status === "Manipulated" 
+                ? "Synthetic patterns detected in text structure." 
+                : "Text appears human-written."),
+            }, 
             fileName: "Text Analysis", 
             timestamp: new Date().toISOString() 
           }
         });
       }
-<<<<<<< HEAD
     } catch (err: any) {
       setIsProcessing(false);
       setProgress(0);
@@ -616,47 +651,6 @@ function AiPanel({ onCheckLimit, onTrackScan, headers, onTriggerLimitModal }: Pa
       } else {
         alert(err?.response?.data?.message || "Pipeline integration fault.");
       }
-=======
-
-      // 3. Analyze
-      setStatusMessage("Running AI analysis...");
-      const analyzeRequest = await fetch("/api/detection/analyze", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          fileUrl: finalFileUrl,
-          s3Key: finalS3Key,
-          fileName: finalFileName,
-          detectionMode:
-            mode === "file" ? (file?.type.startsWith("video/") ? "video" : "image") : "text",
-        }),
-      });
-      const result = await analyzeRequest.json();
-
-      if (!result.success) throw new Error(result.message);
-
-      setIsAnalyzing(false);
-      navigate({
-        to: "/result",
-        search: {
-          type: "ai",
-          data: {
-            isAIGenerated: result.data.status === "Manipulated",
-            confidence: result.data.confidenceScore / 100,
-            details:
-              result.message ||
-              (result.data.status === "Manipulated"
-                ? "Synthetic artifacts detected consistent with AI generation."
-                : "Likely human-created content."),
-          },
-          fileName: finalFileName,
-          timestamp: new Date().toISOString(),
-        },
-      });
-    } catch (error: any) {
-      alert(error.message || "Analysis failed");
-      setIsAnalyzing(false);
->>>>>>> ab0a51b2a747cdfdb274004d36bf1c6377bc2007
     }
   };
 
@@ -797,7 +791,6 @@ function AiPanel({ onCheckLimit, onTrackScan, headers, onTriggerLimitModal }: Pa
         </>
       )}
 
-<<<<<<< HEAD
       {((mode === "file" && file) || (mode === "text" && textContent.trim())) && !isProcessing && (
         <button
           onClick={executePipeline}
@@ -806,18 +799,6 @@ function AiPanel({ onCheckLimit, onTrackScan, headers, onTriggerLimitModal }: Pa
           Analyze Content
         </button>
       )}
-=======
-      {((mode === "file" && file) || (mode === "text" && textContent.trim())) &&
-        !isAnalyzing &&
-        !isUploading && (
-          <button
-            onClick={handleAnalyze}
-            className="mt-5 rounded-full bg-[#6699ff] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[#6699ff]/90 transition-all"
-          >
-            Analyze Content
-          </button>
-        )}
->>>>>>> ab0a51b2a747cdfdb274004d36bf1c6377bc2007
     </PanelCard>
   );
 }
@@ -842,14 +823,18 @@ function PhishingPanel({ onCheckLimit, onTrackScan, headers, onTriggerLimitModal
     if (onCheckLimit()) return;
 
     setIsAnalyzing(true);
-<<<<<<< HEAD
     setProgress(20);
     setStatusMessage("Querying domain reputation systems...");
 
     try {
+      // Use the unified analyze endpoint with detectionMode: 'phishing'
       const response = await axios.post(
-        `${API_BASE_URL}/detection/analyze-url`,
-        { url },
+        `${API_BASE_URL}/detection/analyze`,
+        { 
+          url, 
+          fileName: url, 
+          detectionMode: "phishing" 
+        },
         { headers }
       );
 
@@ -857,60 +842,24 @@ function PhishingPanel({ onCheckLimit, onTrackScan, headers, onTriggerLimitModal
       onTrackScan();
       setIsAnalyzing(false);
 
+      const report = response.data.data;
+      const confidence = report.confidenceScore / 100;
+
       navigate({
         to: "/result",
         search: {
           type: "phishing",
-          data: response.data.data,
+          data: {
+            isMalicious: report.status === "Manipulated",
+            confidence: Math.min(confidence, 0.98),
+            details: report.status === "Manipulated"
+              ? "This URL exhibits phishing characteristics: domain impersonation, suspicious redirects, and deceptive path structure."
+              : "No obvious phishing patterns detected. Domain appears legitimate based on preliminary heuristics.",
+            riskLevel: confidence > 0.8 ? "high" : "low",
+            url,
+          },
           fileName: url,
           timestamp: new Date().toISOString(),
-=======
-    setProgress(0);
-    const steps = [
-      { progress: 10, message: "Validating URL format..." },
-      { progress: 30, message: "Checking domain reputation..." },
-      { progress: 55, message: "Scanning for phishing indicators..." },
-      { progress: 75, message: "Analyzing URL structure & redirects..." },
-      { progress: 95, message: "Cross-referencing threat databases..." },
-      { progress: 100, message: "Risk assessment complete." },
-    ];
-    for (const step of steps) {
-      await new Promise((resolve) => setTimeout(resolve, 400));
-      setProgress(step.progress);
-      setStatusMessage(step.message);
-    }
-    const urlLower = url.toLowerCase();
-    const suspiciousKeywords = [
-      "verify",
-      "secure",
-      "login",
-      "account",
-      "update",
-      "confirm",
-      "bank",
-      "paypal",
-      "apple",
-    ];
-    const suspiciousScore =
-      suspiciousKeywords.filter((k) => urlLower.includes(k)).length / suspiciousKeywords.length;
-    const isMalicious =
-      suspiciousScore > 0.3 || urlLower.includes("-verify-") || urlLower.includes("secure-");
-    const confidence = 0.6 + suspiciousScore * 0.4;
-    const riskLevel = confidence > 0.8 ? "high" : confidence > 0.55 ? "medium" : "low";
-    setIsAnalyzing(false);
-    navigate({
-      to: "/result",
-      search: {
-        type: "phishing",
-        data: {
-          isMalicious,
-          confidence: Math.min(confidence, 0.98),
-          details: isMalicious
-            ? "This URL exhibits phishing characteristics: domain impersonation, suspicious redirects, and deceptive path structure."
-            : "No obvious phishing patterns detected. Domain appears legitimate based on preliminary heuristics.",
-          riskLevel,
-          url,
->>>>>>> ab0a51b2a747cdfdb274004d36bf1c6377bc2007
         },
       });
     } catch (err: any) {
