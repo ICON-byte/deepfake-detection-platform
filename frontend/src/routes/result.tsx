@@ -164,10 +164,10 @@ function ResultPage() {
               <div className="bg-slate-50 rounded-2xl p-6 border border-slate-200">
                 <div className="flex justify-between items-end mb-4">
                   <div>
-                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Detection Confidence</p>
-                    <p className={`text-5xl font-bold ${scoreColor}`}>
-                      {confidencePercent}%
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
+                      Detection Confidence
                     </p>
+                    <p className={`text-5xl font-bold ${scoreColor}`}>{confidencePercent}%</p>
                   </div>
                   <div className="text-xs font-semibold px-3 py-1.5 rounded-full bg-slate-200 text-slate-700">
                     {isDeepfake ? "MANIPULATED" : "AUTHENTIC"}
@@ -176,7 +176,9 @@ function ResultPage() {
                 <div className="h-4 rounded-full bg-slate-300 overflow-hidden mb-4">
                   <div
                     className={`h-full rounded-full transition-all duration-500 ${
-                      isDeepfake ? "bg-gradient-to-r from-red-500 to-red-600" : "bg-gradient-to-r from-green-500 to-green-600"
+                      isDeepfake
+                        ? "bg-linear-to-r from-red-500 to-red-600"
+                        : "bg-linear-to-r from-green-500 to-green-600"
                     }`}
                     style={{ width: `${confidencePercent}%` }}
                   />
@@ -192,7 +194,11 @@ function ResultPage() {
                       <div className="p-2 bg-slate-100 rounded-lg">
                         <Shield className="h-5 w-5 text-[#6699ff]" />
                       </div>
-                      <span className={`text-2xl font-bold ${artifactScore > 70 ? "text-red-600" : "text-green-600"}`}>{artifactScore}%</span>
+                      <span
+                        className={`text-2xl font-bold ${artifactScore > 70 ? "text-red-600" : "text-green-600"}`}
+                      >
+                        {artifactScore}%
+                      </span>
                     </div>
                     <p className="text-sm font-semibold text-slate-900 mb-1">Artifact Scan</p>
                     <p className="text-xs text-slate-600">GAN artifacts & noise patterns</p>
@@ -202,7 +208,11 @@ function ResultPage() {
                       <div className="p-2 bg-slate-100 rounded-lg">
                         <Brain className="h-5 w-5 text-[#6699ff]" />
                       </div>
-                      <span className={`text-2xl font-bold ${faceConsistency > 70 ? "text-green-600" : "text-red-600"}`}>{faceConsistency}%</span>
+                      <span
+                        className={`text-2xl font-bold ${faceConsistency > 70 ? "text-green-600" : "text-red-600"}`}
+                      >
+                        {faceConsistency}%
+                      </span>
                     </div>
                     <p className="text-sm font-semibold text-slate-900 mb-1">Facial Consistency</p>
                     <p className="text-xs text-slate-600">Landmark alignment & symmetry</p>
@@ -212,7 +222,11 @@ function ResultPage() {
                       <div className="p-2 bg-slate-100 rounded-lg">
                         <Target className="h-5 w-5 text-[#6699ff]" />
                       </div>
-                      <span className={`text-2xl font-bold ${lightingAnalysis > 70 ? "text-green-600" : "text-red-600"}`}>{lightingAnalysis}%</span>
+                      <span
+                        className={`text-2xl font-bold ${lightingAnalysis > 70 ? "text-green-600" : "text-red-600"}`}
+                      >
+                        {lightingAnalysis}%
+                      </span>
                     </div>
                     <p className="text-sm font-semibold text-slate-900 mb-1">Lighting Analysis</p>
                     <p className="text-xs text-slate-600">Shadow & illumination consistency</p>
@@ -234,7 +248,8 @@ function ResultPage() {
 
               <div className="rounded-2xl p-6 border border-slate-200 bg-slate-50">
                 <p className="text-sm font-medium leading-relaxed text-slate-900">
-                  <strong>Recommendation:</strong> {isDeepfake
+                  <strong>Recommendation:</strong>{" "}
+                  {isDeepfake
                     ? " This media shows strong signs of manipulation. Do not rely on it as evidence. Verify with original sources before sharing."
                     : " No deepfake patterns detected. The media appears authentic and safe for standard use."}
                 </p>
@@ -244,16 +259,22 @@ function ResultPage() {
                 <div className="flex flex-wrap items-center gap-4 text-sm text-slate-600 border-t border-slate-200 pt-6 mt-6">
                   <div className="flex items-center gap-2">
                     <FileImage className="h-4 w-4 text-[#6699ff]" />
-                    <span><strong>File:</strong> {fileName}</span>
+                    <span>
+                      <strong>File:</strong> {fileName}
+                    </span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Clock className="h-4 w-4 text-[#6699ff]" />
-                    <span><strong>Analyzed:</strong> {formatTimestamp()}</span>
+                    <span>
+                      <strong>Analyzed:</strong> {formatTimestamp()}
+                    </span>
                   </div>
                   {analysisDuration && (
                     <div className="flex items-center gap-2">
                       <Zap className="h-4 w-4 text-[#6699ff] animate-pulse" />
-                      <span><strong>Duration:</strong> <AnimatedDuration duration={analysisDuration} /></span>
+                      <span>
+                        <strong>Duration:</strong> <AnimatedDuration duration={analysisDuration} />
+                      </span>
                     </div>
                   )}
                 </div>
@@ -291,7 +312,9 @@ function ResultPage() {
                   </div>
                   <div>
                     <h1 className="text-4xl font-bold text-slate-900">
-                      {isAIGenerated ? "AI-Generated Content Detected" : "Likely Human-Written / Authentic"}
+                      {isAIGenerated
+                        ? "AI-Generated Content Detected"
+                        : "Likely Human-Written / Authentic"}
                     </h1>
                     <p className="text-sm text-slate-600 mt-2">
                       Analysis completed at {formatTimestamp()}
@@ -319,10 +342,10 @@ function ResultPage() {
               <div className="bg-slate-50 rounded-2xl p-6 border border-slate-200">
                 <div className="flex justify-between items-end mb-4">
                   <div>
-                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Detection Confidence</p>
-                    <p className={`text-5xl font-bold ${scoreColor}`}>
-                      {confidencePercent}%
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
+                      Detection Confidence
                     </p>
+                    <p className={`text-5xl font-bold ${scoreColor}`}>{confidencePercent}%</p>
                   </div>
                   <div className="text-xs font-semibold px-3 py-1.5 rounded-full bg-slate-200 text-slate-700">
                     {isAIGenerated ? "AI GENERATED" : "HUMAN WRITTEN"}
@@ -331,7 +354,9 @@ function ResultPage() {
                 <div className="h-4 rounded-full bg-slate-300 overflow-hidden mb-4">
                   <div
                     className={`h-full rounded-full transition-all duration-500 ${
-                      isAIGenerated ? "bg-gradient-to-r from-amber-500 to-amber-600" : "bg-gradient-to-r from-green-500 to-green-600"
+                      isAIGenerated
+                        ? "bg-linear-to-r from-amber-500 to-amber-600"
+                        : "bg-linear-to-r from-green-500 to-green-600"
                     }`}
                     style={{ width: `${confidencePercent}%` }}
                   />
@@ -376,7 +401,7 @@ function ResultPage() {
               </div>
 
               <div className="flex flex-col md:flex-row items-stretch justify-center gap-6">
-                <div className="w-full md:w-1/2 rounded-2xl border border-slate-200 bg-white p-6 min-h-[160px]">
+                <div className="w-full md:w-1/2 rounded-2xl border border-slate-200 bg-white p-6 min-h-40">
                   <div className="flex items-center gap-2 mb-4">
                     <Zap className="h-5 w-5 text-[#6699ff]" />
                     <h3 className="text-base font-bold text-slate-900">Analysis Explanation</h3>
@@ -388,9 +413,10 @@ function ResultPage() {
                   </p>
                 </div>
 
-                <div className="w-full md:w-1/2 rounded-2xl p-6 border border-slate-200 bg-slate-50 min-h-[160px]">
+                <div className="w-full md:w-1/2 rounded-2xl p-6 border border-slate-200 bg-slate-50 min-h-40">
                   <p className="text-sm font-medium leading-relaxed text-slate-900">
-                    <strong>Recommendation:</strong> {isAIGenerated
+                    <strong>Recommendation:</strong>{" "}
+                    {isAIGenerated
                       ? " This content exhibits strong AI generation markers. Verify with original sources if critical for decision-making."
                       : " No significant AI patterns found. Content appears human-authored with natural variation."}
                   </p>
@@ -401,16 +427,22 @@ function ResultPage() {
                 <div className="flex flex-wrap items-center gap-4 text-sm text-slate-600 border-t border-slate-200 pt-6 mt-6">
                   <div className="flex items-center gap-2">
                     <FileText className="h-4 w-4 text-[#6699ff]" />
-                    <span><strong>File:</strong> {fileName}</span>
+                    <span>
+                      <strong>File:</strong> {fileName}
+                    </span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Clock className="h-4 w-4 text-[#6699ff]" />
-                    <span><strong>Analyzed:</strong> {formatTimestamp()}</span>
+                    <span>
+                      <strong>Analyzed:</strong> {formatTimestamp()}
+                    </span>
                   </div>
                   {analysisDuration && (
                     <div className="flex items-center gap-2">
                       <Zap className="h-4 w-4 text-[#6699ff] animate-pulse" />
-                      <span><strong>Duration:</strong> <AnimatedDuration duration={analysisDuration} /></span>
+                      <span>
+                        <strong>Duration:</strong> <AnimatedDuration duration={analysisDuration} />
+                      </span>
                     </div>
                   )}
                 </div>

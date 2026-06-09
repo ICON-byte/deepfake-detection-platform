@@ -130,7 +130,7 @@ function HomePage() {
 
         {/* Optional Glow */}
         <div
-          className="absolute left-1/2 top-0 h-150 w-225 -translate-x-1/2 rounded-full blur-3xl"
+          className="absolute left-1/2 top-0 h-37.5 w-56.25 -translate-x-1/2 rounded-full blur-3xl"
           style={{
             background:
               "radial-gradient(circle, rgba(102,153,255,0.18) 0%, rgba(102,153,255,0.08) 45%, transparent 75%)",
@@ -159,9 +159,8 @@ function HomePage() {
 
           {/* Description */}
           <p className="mx-auto mt-6 max-w-3xl text-lg leading-8 text-gray-600 sm:text-xl">
-            TruthLens AI analyzes images, videos, and audio for signs of
-            manipulation using advanced AI detection technology. Get clear
-            authenticity insights in seconds.
+            TruthLens AI analyzes images, videos, and audio for signs of manipulation using advanced
+            AI detection technology. Get clear authenticity insights in seconds.
           </p>
 
           {/* Button */}
@@ -210,7 +209,10 @@ function HomePage() {
                 <p className="mt-6 text-sm leading-relaxed text-gray-500">{f.desc}</p>
               </div>
               <div className="mt-8 pt-4 border-t border-gray-100/50">
-                <a href="#" className="inline-flex items-center gap-1 text-xs font-semibold text-gray-700 hover:text-[#6699ff] transition-colors">
+                <a
+                  href="#"
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-gray-700 hover:text-[#6699ff] transition-colors"
+                >
                   Learn More
                   <ChevronRight className="h-3.5 w-3.5" />
                 </a>
@@ -231,7 +233,8 @@ function HomePage() {
               How it <span className="text-white bg-[#6699ff] px-2 py-0.5 rounded-none">Works</span>
             </h2>
             <p className="mx-auto mt-4 max-w-xl text-gray-500 text-sm sm:text-base">
-              A simple three-step process designed to help you verify digital content quickly and confidently.
+              A simple three-step process designed to help you verify digital content quickly and
+              confidently.
             </p>
           </div>
 
@@ -245,7 +248,7 @@ function HomePage() {
                     <div className="absolute inset-0 bg-[#6699ff]/40 translate-y-2 scale-[0.97] rounded-2xl -z-10" />
                   </>
                 )}
-                
+
                 <div
                   className={`rounded-2xl border p-8 h-full transition-all flex flex-col justify-between ${
                     i === 1
@@ -304,7 +307,9 @@ function HomePage() {
       <section className="mx-auto max-w-5xl px-4 pb-24 sm:px-6 lg:px-8">
         <div className="relative overflow-hidden rounded-3xl bg-linear-to-br from-[#6699ff] to-[#4e88ff] p-7 text-center text-white shadow-xl shadow-[#6699ff]/25 sm:p-12">
           <div className="relative z-10">
-            <h3 className="text-2xl font-bold tracking-tight sm:text-3xl">Ready to verify the truth?</h3>
+            <h3 className="text-2xl font-bold tracking-tight sm:text-3xl">
+              Ready to verify the truth?
+            </h3>
             <p className="mx-auto mt-3 max-w-xl text-sm text-blue-50/90 sm:text-base">
               Upload your first file and get fast, reliable authenticity analysis from TruthLens AI.
             </p>
