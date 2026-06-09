@@ -156,7 +156,7 @@ function ResultPage() {
                 <div className="h-4 rounded-full bg-slate-300 overflow-hidden mb-4">
                   <div
                     className={`h-full rounded-full transition-all duration-500 ${
-                      isDeepfake ? "bg-gradient-to-r from-red-500 to-red-600" : "bg-gradient-to-r from-green-500 to-green-600"
+                      isDeepfake ? "bg-linear-to-r from-red-500 to-red-600" : "bg-linear-to-r from-green-500 to-green-600"
                     }`}
                     style={{ width: `${confidencePercent}%` }}
                   />
@@ -305,7 +305,7 @@ function ResultPage() {
                 <div className="h-4 rounded-full bg-slate-300 overflow-hidden mb-4">
                   <div
                     className={`h-full rounded-full transition-all duration-500 ${
-                      isAIGenerated ? "bg-gradient-to-r from-amber-500 to-amber-600" : "bg-gradient-to-r from-green-500 to-green-600"
+                      isAIGenerated ? "bg-linear-to-r from-amber-500 to-amber-600" : "bg-linear-to-r from-green-500 to-green-600"
                     }`}
                     style={{ width: `${confidencePercent}%` }}
                   />
@@ -350,7 +350,7 @@ function ResultPage() {
               </div>
 
               <div className="flex flex-col md:flex-row items-stretch justify-center gap-6">
-                <div className="w-full md:w-1/2 rounded-2xl border border-slate-200 bg-white p-6 min-h-[160px]">
+                <div className="w-full md:w-1/2 rounded-2xl border border-slate-200 bg-white p-6 min-h-40">
                   <div className="flex items-center gap-2 mb-4">
                     <Zap className="h-5 w-5 text-[#6699ff]" />
                     <h3 className="text-base font-bold text-slate-900">Analysis Explanation</h3>
@@ -362,7 +362,7 @@ function ResultPage() {
                   </p>
                 </div>
 
-                <div className="w-full md:w-1/2 rounded-2xl p-6 border border-slate-200 bg-slate-50 min-h-[160px]">
+                <div className="w-full md:w-1/2 rounded-2xl p-6 border border-slate-200 bg-slate-50 min-h-40">
                   <p className="text-sm font-medium leading-relaxed text-slate-900">
                     <strong>Recommendation:</strong> {isAIGenerated
                       ? " This content exhibits strong AI generation markers. Verify with original sources if critical for decision-making."
@@ -456,7 +456,7 @@ function ResultPage() {
                 <div className="h-4 rounded-full bg-slate-300 overflow-hidden mb-4">
                   <div
                     className={`h-full rounded-full transition-all duration-500 ${
-                      isMalicious ? (riskLevel === "high" ? "bg-gradient-to-r from-red-500 to-red-600" : "bg-gradient-to-r from-amber-500 to-amber-600") : "bg-gradient-to-r from-green-500 to-green-600"
+                      isMalicious ? (riskLevel === "high" ? "bg-linear-to-r from-red-500 to-red-600" : "bg-linear-to-r from-amber-500 to-amber-600") : "bg-linear-to-r from-green-500 to-green-600"
                     }`}
                     style={{ width: `${confidencePercent}%` }}
                   />
@@ -538,11 +538,11 @@ function ResultPage() {
 
               <div className="flex flex-wrap items-center gap-4 text-sm text-slate-600 border-t border-slate-200 pt-6 mt-6">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <Link2 className="h-4 w-4 text-[#6699ff] flex-shrink-0" />
+                  <Link2 className="h-4 w-4 text-[#6699ff] shrink-0" />
                   <span className="break-all"><strong>URL:</strong> {url || "Not saved"}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-[#6699ff] flex-shrink-0" />
+                  <Clock className="h-4 w-4 text-[#6699ff] shrink-0" />
                   <span><strong>Analyzed:</strong> {formatTimestamp()}</span>
                 </div>
               </div>

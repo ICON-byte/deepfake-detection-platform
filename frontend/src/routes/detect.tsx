@@ -185,10 +185,10 @@ function GreyBlockBackground() {
       <div className="absolute right-[14%] top-0 h-28 w-44 bg-slate-100/70" />
       <div className="absolute right-[6%] top-28 h-28 w-28 bg-slate-100/55" />
       <div className="absolute left-0 top-80 h-28 w-28 bg-slate-100/55" />
-      <div className="absolute left-[17%] top-[27rem] h-28 w-36 bg-slate-100/55" />
-      <div className="absolute left-[34%] top-[27rem] h-56 w-28 bg-slate-100/45" />
+      <div className="absolute left-[17%] top-108 h-28 w-36 bg-slate-100/55" />
+      <div className="absolute left-[34%] top-108 h-56 w-28 bg-slate-100/45" />
       <div className="absolute right-[26%] top-80 h-56 w-28 bg-slate-100/60" />
-      <div className="absolute right-[8%] top-[27rem] h-28 w-28 bg-slate-100/60" />
+      <div className="absolute right-[8%] top-108 h-28 w-28 bg-slate-100/60" />
       <div className="absolute left-[8%] bottom-0 h-28 w-28 bg-slate-100/65" />
       <div className="absolute right-[14%] bottom-0 h-28 w-44 bg-slate-100/50" />
     </div>

@@ -133,7 +133,7 @@ function RegisterPage() {
                 </label>
                 <div className="relative">
                   <svg
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-[18px] h-[18px]"
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4.5 h-4.5"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -163,7 +163,7 @@ function RegisterPage() {
                 </label>
                 <div className="relative">
                   <svg
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-[18px] h-[18px]"
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4.5 h-4.5"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -193,7 +193,7 @@ function RegisterPage() {
                 </label>
                 <div className="relative">
                   <svg
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-[18px] h-[18px]"
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4.5 h-4.5"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -220,7 +220,7 @@ function RegisterPage() {
                   >
                     {showPassword ? (
                       <svg
-                        className="w-[18px] h-[18px]"
+                        className="w-4.5 h-4.5"
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
@@ -234,7 +234,7 @@ function RegisterPage() {
                       </svg>
                     ) : (
                       <svg
-                        className="w-[18px] h-[18px]"
+                        className="w-4.5 h-4.5"
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
@@ -264,7 +264,7 @@ function RegisterPage() {
                 </label>
                 <div className="relative">
                   <svg
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-[18px] h-[18px]"
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4.5 h-4.5"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -291,7 +291,7 @@ function RegisterPage() {
                   >
                     {showConfirmPassword ? (
                       <svg
-                        className="w-[18px] h-[18px]"
+                        className="w-4.5 h-4.5"
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
@@ -305,7 +305,7 @@ function RegisterPage() {
                       </svg>
                     ) : (
                       <svg
-                        className="w-[18px] h-[18px]"
+                        className="w-4.5 h-4.5"
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
