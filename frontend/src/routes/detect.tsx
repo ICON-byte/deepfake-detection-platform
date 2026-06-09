@@ -5,122 +5,15 @@ import {
   ShieldCheck,
   FileText,
   RotateCcw,
-  Loader2,
-  Image,
-  FileCode2,
-  Link2,
-  File,
-  X,
-  Lock,
-} from "lucide-react";
-import { useState, useRef, useEffect } from "react";
-import axios from "axios";
-
-// Target backend API base configuration
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
-
-export const Route = createFileRoute("/detect")({
-  head: () => ({
-    meta: [
-      { title: "Detect · TruthLens" },
-      {
-        name: "description",
-        content: "Run TruthLens deepfake, AI-generated content, and phishing analysis.",
-      },
-      { property: "og:title", content: "TruthLens Detect" },
-      {
-        property: "og:description",
-        content: "Verify media files, text and suspicious URLs in seconds.",
-      },
-    ],
-  }),
-  component: DetectPage,
-});
-
-type Tab = "deepfake" | "ai" | "phishing";
-
-function DetectPage() {
-  const [tab, setTab] = useState<Tab>("deepfake");
-  const [showLimitModal, setShowLimitModal] = useState(false);
-
-  // Helper hook to check authentication and manage session-based free local usage
-  const checkGuestLimitReached = (): boolean => {
-    const token = localStorage.getItem("truthlens_token");
-    if (token) return false; // Authenticated users have unlimited access
-
-    const currentScans = parseInt(sessionStorage.getItem("truthlens_guest_scans") || "0", 10);
-    if (currentScans >= 3) {
-      setShowLimitModal(true);
-      return true;
-    }
-    return false;
-  };
-
-  // Helper to increment scan counts for guests
-  const incrementGuestScanCount = () => {
-    const token = localStorage.getItem("truthlens_token");
-    if (!token) {
-      const currentScans = parseInt(sessionStorage.getItem("truthlens_guest_scans") || "0", 10);
-      sessionStorage.setItem("truthlens_guest_scans", (currentScans + 1).toString());
-    }
-  };
-
-  // Safe Header generator to attach bearer tokens automatically
-  const getAuthHeaders = () => {
-    const token = localStorage.getItem("truthlens_token");
-    return token ? { Authorization: `Bearer ${token}` } : {};
-  };
-
-  return (
-    <SiteLayout>
-      <section className="relative overflow-hidden bg-background">
-        <GreyBlockBackground />
-        <div className="relative mx-auto max-w-5xl px-3 pb-12 pt-28 sm:px-6 sm:pt-32 lg:px-8">
-          <div className="text-center">
-            <span className="inline-flex max-w-full items-center gap-2 rounded-full border border-[#6699ff]/30 bg-[#6699ff]/5 px-4 py-1.5 text-sm font-medium text-[#6699ff]">
-              <ShieldCheck className="h-4 w-4" /> Multiple detection workflows for media and
-              suspicious links.
-            </span>
-            <h1 className="mt-5 text-3xl font-bold sm:text-5xl">TruthLens Detect</h1>
-            <p className="mx-auto mt-4 max-w-2xl text-base text-muted-foreground sm:text-lg">
-              Select a workflow below, then upload files or paste content for real-time deepfake,
-              AI, and phishing analysis.
-            </p>
-          </div>
-
-          <div className="mx-auto mt-10 max-w-2xl bg-gray-100/60 border border-gray-200/60 p-1 rounded-3xl sm:rounded-full shadow-inner">
-            <div className="grid grid-cols-1 gap-1 sm:grid-cols-3 items-center">
-              <TabBtn active={tab === "deepfake"} onClick={() => setTab("deepfake")}>
-                Deepfake Detect
-              </TabBtn>
-              <TabBtn active={tab === "ai"} onClick={() => setTab("ai")}>
-                AI Generated Content
-              </TabBtn>
-              <TabBtn active={tab === "phishing"} onClick={() => setTab("phishing")}>
-                Phishing
-              </TabBtn>
-            </div>
-          </div>
-
-          <div className="mt-8">
-            {tab === "deepfake" && (
-              <DeepfakePanel 
-                onCheckLimit={checkGuestLimitReached} 
-                onTrackScan={incrementGuestScanCount} 
-                headers={getAuthHeaders()}
-                onTriggerLimitModal={() => setShowLimitModal(true)}
-              />
-            )}
-            {tab === "ai" && (
-              <AiPanel 
-                onCheckLimit={checkGuestLimitReached} 
-                onTrackScan={incrementGuestScanCount} 
-                headers={getAuthHeaders()}
-                onTriggerLimitModal={() => setShowLimitModal(true)}
-              />
-            )}
-            {tab === "phishing" && (
-              <PhishingPanel 
+      }
+    } catch (err: any) {
+      setIsProcessing(false);
+      setProgress(0);
+      if (err?.response?.status === 429) {
+        onTriggerLimitModal();
+      } else {
+        alert(err?.response?.data?.message || "Pipeline integration fault.");
+      }
                 onCheckLimit={checkGuestLimitReached} 
                 onTrackScan={incrementGuestScanCount} 
                 headers={getAuthHeaders()}
@@ -343,19 +236,7 @@ function DeepfakePanel({ onCheckLimit, onTrackScan, headers, onTriggerLimitModal
         to: "/result",
         search: {
           type: "deepfake",
-<<<<<<< HEAD
           data: analysisResponse.data.data,
-=======
-          data: {
-            isDeepfake: result.data.status === "Manipulated",
-            confidence: result.data.confidenceScore / 100,
-            details:
-              result.message ||
-              (result.data.status === "Manipulated"
-                ? "Multiple manipulation traces detected including inconsistent lighting and warped facial features."
-                : "No significant deepfake patterns found. Image appears authentic."),
-          },
->>>>>>> ab0a51b2a747cdfdb274004d36bf1c6377bc2007
           fileName: file.name,
           timestamp: new Date().toISOString(),
         },
@@ -476,20 +357,8 @@ function AiPanel({ onCheckLimit, onTrackScan, headers, onTriggerLimitModal }: Pa
   }, [previewUrl]);
 
   const handleFileSelect = async (selectedFile: File | null) => {
-<<<<<<< HEAD
     if (selectedFile && (selectedFile.type.startsWith("image/") || selectedFile.type === "text/plain")) {
       if (onCheckLimit()) return;
-=======
-    if (
-      selectedFile &&
-      (selectedFile.type.startsWith("image/") ||
-        selectedFile.type.startsWith("video/") ||
-        selectedFile.type === "text/plain")
-    ) {
-      setIsUploading(true);
-      await new Promise((resolve) => setTimeout(resolve, 1200));
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
->>>>>>> ab0a51b2a747cdfdb274004d36bf1c6377bc2007
       setFile(selectedFile);
       if (selectedFile.type.startsWith("image/")) {
         if (previewUrl) URL.revokeObjectURL(previewUrl);
@@ -619,7 +488,6 @@ function AiPanel({ onCheckLimit, onTrackScan, headers, onTriggerLimitModal }: Pa
 =======
 
       // 3. Analyze
-      setStatusMessage("Running AI analysis...");
       const analyzeRequest = await fetch("/api/detection/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -628,47 +496,6 @@ function AiPanel({ onCheckLimit, onTrackScan, headers, onTriggerLimitModal }: Pa
           s3Key: finalS3Key,
           fileName: finalFileName,
           detectionMode:
-            mode === "file" ? (file?.type.startsWith("video/") ? "video" : "image") : "text",
-        }),
-      });
-      const result = await analyzeRequest.json();
-
-      if (!result.success) throw new Error(result.message);
-
-      setIsAnalyzing(false);
-      navigate({
-        to: "/result",
-        search: {
-          type: "ai",
-          data: {
-            isAIGenerated: result.data.status === "Manipulated",
-            confidence: result.data.confidenceScore / 100,
-            details:
-              result.message ||
-              (result.data.status === "Manipulated"
-                ? "Synthetic artifacts detected consistent with AI generation."
-                : "Likely human-created content."),
-          },
-          fileName: finalFileName,
-          timestamp: new Date().toISOString(),
-        },
-      });
-    } catch (error: any) {
-      alert(error.message || "Analysis failed");
-      setIsAnalyzing(false);
->>>>>>> ab0a51b2a747cdfdb274004d36bf1c6377bc2007
-    }
-  };
-
-  return (
-    <PanelCard title="AI Generated Content Scan" icon={<FileCode2 className="h-5 w-5" />}>
-      <p className="mt-2 text-sm text-muted-foreground">
-        Detect synthetic media and AI-written text using advanced pattern recognition.
-      </p>
-
-      <div className="mt-4 inline-flex bg-gray-100/60 border border-gray-200/60 p-1 rounded-full shadow-inner max-w-xs w-full">
-        <div className="grid grid-cols-2 gap-1 w-full items-center">
-          <button
             onClick={() => {
               setMode("file");
               resetAnalysis();
