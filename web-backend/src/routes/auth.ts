@@ -5,10 +5,10 @@ import { User } from '../models/User';
 
 const router = Router();
 
-// Helper function to generate signed JWTs
-const generateToken = (id: string, tier: string): string => {
+// Helper function to generate signed JWTs (Stripped down to only use user ID)
+const generateToken = (id: string): string => {
   return jwt.sign(
-    { id, tier }, 
+    { id }, 
     process.env.JWT_SECRET || 'fallback_secret', 
     { expiresIn: '30d' } // Token lasts for 30 days
   );
@@ -16,7 +16,7 @@ const generateToken = (id: string, tier: string): string => {
 
 // ==========================================
 // ROUTE: POST /api/auth/register
-// DESC:  Create a new user account (defaults to 'free' tier)
+// DESC:  Create a new user account
 // ==========================================
 router.post('/register', async (req: Request, res: Response): Promise<any> => {
   try {
@@ -37,23 +37,21 @@ router.post('/register', async (req: Request, res: Response): Promise<any> => {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    // 4. Save the user document to MongoDB
+    // 4. Save the user document to MongoDB (Removed tier field)
     const newUser = await User.create({
       fullName,
       email,
       password: hashedPassword,
-      tier: 'free' // Every registration defaults to the free tier baseline
     });
 
     // 5. Send back account confirmation and the access token
     return res.status(201).json({
       success: true,
-      token: generateToken(newUser._id.toString(), newUser.tier),
+      token: generateToken(newUser._id.toString()),
       user: {
         id: newUser._id,
         fullName: newUser.fullName,
         email: newUser.email,
-        tier: newUser.tier
       }
     });
 
@@ -91,12 +89,11 @@ router.post('/login', async (req: Request, res: Response): Promise<any> => {
     // 4. Return user profile metrics and their active session token
     return res.json({
       success: true,
-      token: generateToken(user._id.toString(), user.tier),
+      token: generateToken(user._id.toString()),
       user: {
         id: user._id,
         fullName: user.fullName,
         email: user.email,
-        tier: user.tier
       }
     });
 

@@ -24,10 +24,9 @@ export const protect = async (
         process.env.JWT_SECRET || 'fallback_secret'
       ) as TJwtPayload;
 
-      // 3. Attach the decoded payload (id and tier) to the request object
+      // 3. Attach only the decoded user id to the request object
       req.user = {
         id: decoded.id,
-        tier: decoded.tier,
       };
 
       // Pass control to the next middleware or route handler

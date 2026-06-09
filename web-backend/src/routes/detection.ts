@@ -15,8 +15,12 @@ const optionalAuth = (req: Request, res: Response, next: any) => {
   if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
     try {
       const token = req.headers.authorization.split(' ')[1];
+      // Decodes token using the updated interface without tier properties
       const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret') as TJwtPayload;
-      req.user = decoded;
+      
+      req.user = {
+        id: decoded.id
+      };
     } catch (error) {
       console.warn('⚠️ Optional Auth: Token provided but invalid.');
     }
@@ -127,7 +131,8 @@ router.post('/analyze', optionalAuth, checkRateLimit, async (
     }
 
     console.log(`🤖 [GATEWAY] Routing token to AI Framework -> [${pythonServerUrl}/${targetEndpoint}]`);
-    console.log(`   [ASSET] ${accessUrl.substring(0, 100)}${accessUrl.length > 100 ? '...' : ''}`);
+    const displayUrl = accessUrl ? String(accessUrl) : '';
+    console.log(`   [ASSET] ${displayUrl.substring(0, 100)}${displayUrl.length > 100 ? '...' : ''}`);
     
     const gatewayStart = Date.now();
     // 2. Transmit standard payload to target AI engine channel
@@ -163,7 +168,6 @@ router.post('/analyze', optionalAuth, checkRateLimit, async (
       status: mappedStatus,
       detectionMode: detectionMode as any,
       analysisBreakdown: {
-        // Diversify based on detectionMode
         pixelAnalysis: aiData.breakdown?.anatomicalAccuracy || aiData.breakdown?.pixelAnalysis || aiData.breakdown?.textureArtifacts || aiData.breakdown?.semanticAnalysis || aiData.breakdown?.urlAnalysis || 0,
         compression: aiData.breakdown?.lightingConsistency || aiData.breakdown?.vocalConsistency || aiData.breakdown?.compression || aiData.breakdown?.globalCoherence || aiData.breakdown?.stylisticAnalysis || aiData.breakdown?.domainReputation || 0,
         frequency: aiData.breakdown?.backgroundCoherence || aiData.breakdown?.breathPatterns || aiData.breakdown?.frequency || aiData.breakdown?.frameConsistency || aiData.breakdown?.structuralHeuristics || 0,
@@ -178,9 +182,7 @@ router.post('/analyze', optionalAuth, checkRateLimit, async (
       message: aiData.rationale || undefined
     });
 
-
   } catch (error: any) {
-    // Gracefully catch and handle specific Axios/FastAPI errors (like 422 "No face detected")
     if (error.response) {
       console.error(`🔴 Python AI Endpoint Error [Status ${error.response.status}]:`, error.response.data);
       
