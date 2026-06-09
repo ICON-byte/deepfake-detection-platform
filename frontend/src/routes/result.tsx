@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
   CheckCircle2,
   XCircle,
@@ -18,32 +18,52 @@ import {
 } from "lucide-react";
 import { SiteLayout } from "@/components/SiteLayout";
 
+// Custom component for the clock animation
+const AnimatedDuration = ({ duration }: { duration: number }) => {
+  const [displayValue, setDisplayValue] = useState(0);
+
+  useEffect(() => {
+    let start = 0;
+    const end = duration;
+    const totalDuration = 1500; // 1.5 seconds for the animation
+    const increment = end / (totalDuration / 16); // 60fps approx
+
+    const timer = setInterval(() => {
+      start += increment;
+      if (start >= end) {
+        setDisplayValue(end);
+        clearInterval(timer);
+      } else {
+        setDisplayValue(start);
+      }
+    }, 16);
+
+    return () => clearInterval(timer);
+  }, [duration]);
+
+  return <span>{displayValue.toFixed(2)}s</span>;
+};
+
 // Define TypeScript interfaces for type-safe parameter processing
 interface DeepfakeData {
   isDeepfake: boolean;
   confidence: number;
   details: string;
+  analysisDuration?: number;
 }
 
 interface AIData {
   isAIGenerated: boolean;
   confidence: number;
   details: string;
-}
-
-interface PhishingData {
-  isMalicious: boolean;
-  confidence: number;
-  details: string;
-  riskLevel: "low" | "high";
-  url?: string;
+  analysisDuration?: number;
 }
 
 export const Route = createFileRoute("/result")({
   component: ResultPage,
   validateSearch: (search: Record<string, unknown>) => {
     return {
-      type: search.type as "deepfake" | "ai" | "phishing",
+      type: search.type as "deepfake" | "ai",
       data: search.data as any,
       fileName: search.fileName as string | undefined,
       timestamp: search.timestamp as string | undefined,
@@ -92,7 +112,7 @@ function ResultPage() {
 
   // 1. DEEPFAKE ANALYSIS CARD
   if (type === "deepfake") {
-    const { isDeepfake, confidence, details } = data as DeepfakeData;
+    const { isDeepfake, confidence, details, analysisDuration } = data as DeepfakeData;
     const confidencePercent = (confidence * 100).toFixed(1);
     const scoreColor = isDeepfake ? "text-red-600" : "text-green-600";
 
@@ -230,6 +250,12 @@ function ResultPage() {
                     <Clock className="h-4 w-4 text-[#6699ff]" />
                     <span><strong>Analyzed:</strong> {formatTimestamp()}</span>
                   </div>
+                  {analysisDuration && (
+                    <div className="flex items-center gap-2">
+                      <Zap className="h-4 w-4 text-[#6699ff] animate-pulse" />
+                      <span><strong>Duration:</strong> <AnimatedDuration duration={analysisDuration} /></span>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -241,7 +267,7 @@ function ResultPage() {
 
   // 2. LINGUISTIC TEXT / AI ANALYSIS CARD
   if (type === "ai") {
-    const { isAIGenerated, confidence, details } = data as AIData;
+    const { isAIGenerated, confidence, details, analysisDuration } = data as AIData;
     const confidencePercent = (confidence * 100).toFixed(1);
     const scoreColor = isAIGenerated ? "text-amber-600" : "text-green-600";
 
@@ -381,171 +407,14 @@ function ResultPage() {
                     <Clock className="h-4 w-4 text-[#6699ff]" />
                     <span><strong>Analyzed:</strong> {formatTimestamp()}</span>
                   </div>
+                  {analysisDuration && (
+                    <div className="flex items-center gap-2">
+                      <Zap className="h-4 w-4 text-[#6699ff] animate-pulse" />
+                      <span><strong>Duration:</strong> <AnimatedDuration duration={analysisDuration} /></span>
+                    </div>
+                  )}
                 </div>
               )}
-            </div>
-          </div>
-        </div>
-      </SiteLayout>
-    );
-  }
-
-  // 3. PHISHING NETWORK / URL ANALYSIS CARD
-  if (type === "phishing") {
-    const { isMalicious, confidence, details, riskLevel, url } = data as PhishingData;
-    const confidencePercent = (confidence * 100).toFixed(1);
-
-    const domainAge = isMalicious ? "< 30 days" : "> 2 years";
-    const sslValid = isMalicious ? "Self-signed" : "Valid (Let's Encrypt)";
-    const redirects = isMalicious ? 3 : 0;
-    const blacklistCount = isMalicious ? 4 : 0;
-
-    return (
-      <SiteLayout>
-        <div className="mx-auto max-w-5xl px-4 py-12 mt-24 mb-20">
-          <div className="rounded-3xl bg-white border border-slate-200 shadow-lg overflow-hidden mb-8">
-            <div className="px-8 py-10 border-b border-slate-200 bg-white">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="p-2.5 bg-slate-100 rounded-2xl">
-                    {isMalicious ? (
-                      <XCircle className="h-8 w-8 text-[#6699ff]" />
-                    ) : (
-                      <CheckCircle2 className="h-8 w-8 text-[#6699ff]" />
-                    )}
-                  </div>
-                  <div>
-                    <h1 className="text-4xl font-bold text-slate-900">
-                      {isMalicious ? "Suspicious / Malicious URL Detected" : "URL Appears Safe"}
-                    </h1>
-                    <p className="text-sm text-slate-600 mt-2">
-                      Analysis completed at {formatTimestamp()}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex gap-3 flex-wrap justify-end">
-                  <button
-                    onClick={handleDownloadReport}
-                    className="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 hover:border-slate-400 transition-all shadow-sm cursor-pointer"
-                  >
-                    <Download className="h-4 w-4" /> Report
-                  </button>
-                  <button
-                    onClick={handleNewAnalysis}
-                    className="inline-flex items-center gap-2 rounded-full bg-[#6699ff] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[#5588ee] transition-all shadow-md hover:shadow-lg cursor-pointer"
-                  >
-                    <RotateCcw className="h-4 w-4" /> New Analysis
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div className="px-8 py-8 space-y-8">
-              <div className="bg-slate-50 rounded-2xl p-6 border border-slate-200">
-                <div className="flex justify-between items-end mb-4">
-                  <div>
-                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Security Confidence</p>
-                    <p className={`text-5xl font-bold ${isMalicious ? (riskLevel === "high" ? "text-red-600" : "text-amber-600") : "text-green-600"}`}>
-                      {confidencePercent}%
-                    </p>
-                  </div>
-                  <div className="text-xs font-semibold px-3 py-1.5 rounded-full bg-slate-200 text-slate-700">
-                    {isMalicious ? (riskLevel === "high" ? "CRITICAL" : "WARNING") : "SAFE"}
-                  </div>
-                </div>
-                <div className="h-4 rounded-full bg-slate-300 overflow-hidden mb-4">
-                  <div
-                    className={`h-full rounded-full transition-all duration-500 ${
-                      isMalicious ? (riskLevel === "high" ? "bg-gradient-to-r from-red-500 to-red-600" : "bg-gradient-to-r from-amber-500 to-amber-600") : "bg-gradient-to-r from-green-500 to-green-600"
-                    }`}
-                    style={{ width: `${confidencePercent}%` }}
-                  />
-                </div>
-                <p className="text-sm text-slate-600 leading-relaxed">{details}</p>
-              </div>
-
-              <div>
-                <h2 className="text-lg font-bold text-slate-900 mb-4">Security Analysis</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="rounded-2xl bg-white border border-slate-200 p-6 shadow-sm hover:shadow-md transition-all">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="p-2 bg-slate-100 rounded-lg">
-                        <Clock className="h-5 w-5 text-[#6699ff]" />
-                      </div>
-                      <span className={`text-lg font-bold ${isMalicious ? "text-red-600" : "text-green-600"}`}>{domainAge}</span>
-                    </div>
-                    <p className="text-sm font-semibold text-slate-900 mb-1">Domain Age</p>
-                    <p className="text-xs text-slate-600">Newer domains are higher risk</p>
-                  </div>
-                  <div className="rounded-2xl bg-white border border-slate-200 p-6 shadow-sm hover:shadow-md transition-all">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="p-2 bg-slate-100 rounded-lg">
-                        <Shield className="h-5 w-5 text-[#6699ff]" />
-                      </div>
-                      <span className={`text-lg font-bold ${sslValid.includes("Self") ? "text-red-600" : "text-green-600"}`}>{sslValid.split(" ")[0]}</span>
-                    </div>
-                    <p className="text-sm font-semibold text-slate-900 mb-1">SSL Certificate</p>
-                    <p className="text-xs text-slate-600">Validity & issuer check</p>
-                  </div>
-                  <div className="rounded-2xl bg-white border border-slate-200 p-6 shadow-sm hover:shadow-md transition-all">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="p-2 bg-slate-100 rounded-lg">
-                        <Link2 className="h-5 w-5 text-[#6699ff]" />
-                      </div>
-                      <span className={`text-lg font-bold ${redirects > 0 ? "text-red-600" : "text-green-600"}`}>{redirects}</span>
-                    </div>
-                    <p className="text-sm font-semibold text-slate-900 mb-1">Redirects</p>
-                    <p className="text-xs text-slate-600">Number of redirect chains</p>
-                  </div>
-                  <div className="rounded-2xl bg-white border border-slate-200 p-6 shadow-sm hover:shadow-md transition-all">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="p-2 bg-slate-100 rounded-lg">
-                        <AlertTriangle className="h-5 w-5 text-[#6699ff]" />
-                      </div>
-                      <span className={`text-lg font-bold ${blacklistCount > 0 ? "text-red-600" : "text-green-600"}`}>{blacklistCount}</span>
-                    </div>
-                    <p className="text-sm font-semibold text-slate-900 mb-1">Blacklist Hits</p>
-                    <p className="text-xs text-slate-600">Known threat databases</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-slate-200 bg-white p-6">
-                <div className="flex items-center gap-2 mb-4">
-                  <Zap className="h-5 w-5 text-[#6699ff]" />
-                  <h3 className="text-base font-bold text-slate-900">Security Analysis</h3>
-                </div>
-                <p className="text-sm text-slate-700 leading-relaxed">
-                  {isMalicious
-                    ? riskLevel === "high"
-                      ? "This URL exhibits critical phishing indicators: domain age under 30 days, self-signed SSL certificate, multiple redirect chains, and presence in multiple threat databases. These factors strongly indicate malicious intent."
-                      : "Suspicious characteristics detected: domain age and SSL certificate issues, plus moderate indicators found in threat databases. Exercise caution before interacting with this URL."
-                    : "The domain has established history with valid SSL certificate, no suspicious redirect chains, and no presence in known threat databases. Security indicators suggest this URL is legitimate."}
-                </p>
-              </div>
-
-              <div className="rounded-2xl p-6 border border-slate-200 bg-slate-50">
-                <p className="text-sm font-medium leading-relaxed text-slate-900">
-                  <strong>Recommendation:</strong> {
-                    isMalicious
-                      ? riskLevel === "high"
-                        ? " DO NOT PROCEED. This URL is highly likely to be malicious. Avoid clicking and report it if possible."
-                        : " Exercise caution with this URL. This shows suspicious characteristics. Verify legitimacy before proceeding."
-                      : " No known threats detected. This URL appears safe for standard browsing."
-                  }
-                </p>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-4 text-sm text-slate-600 border-t border-slate-200 pt-6 mt-6">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Link2 className="h-4 w-4 text-[#6699ff] flex-shrink-0" />
-                  <span className="break-all"><strong>URL:</strong> {url || "Not saved"}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-[#6699ff] flex-shrink-0" />
-                  <span><strong>Analyzed:</strong> {formatTimestamp()}</span>
-                </div>
-              </div>
             </div>
           </div>
         </div>

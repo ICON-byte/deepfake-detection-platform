@@ -130,7 +130,7 @@ function HomePage() {
 
         {/* Optional Glow */}
         <div
-          className="absolute left-1/2 top-0 h-[600px] w-[900px] -translate-x-1/2 rounded-full blur-3xl"
+          className="absolute left-1/2 top-0 h-150 w-225 -translate-x-1/2 rounded-full blur-3xl"
           style={{
             background:
               "radial-gradient(circle, rgba(102,153,255,0.18) 0%, rgba(102,153,255,0.08) 45%, transparent 75%)",
@@ -138,7 +138,7 @@ function HomePage() {
         />
 
         {/* Hero Content */}
-        <div className="relative z-10 mx-auto max-w-[90rem] px-3 pb-16 pt-28 text-center sm:px-4 sm:pb-20 lg:px-6 lg:pb-28 lg:pt-36">
+        <div className="relative z-10 mx-auto max-w-360 px-3 pb-16 pt-28 text-center sm:px-4 sm:pb-20 lg:px-6 lg:pb-28 lg:pt-36">
           {/* Badge */}
           <div className="flex justify-center">
             <span className="flex items-center gap-2 rounded-full border border-white/70 bg-white/60 px-5 py-2 text-sm font-medium text-[#6699ff] backdrop-blur-sm shadow-sm">
@@ -152,7 +152,7 @@ function HomePage() {
             Verify Media Authenticity
             <br />
             <span>with </span>
-            <span className="bg-gradient-to-r from-[#B23200] via-[#8A2E73] to-[#2F3BD1] bg-clip-text text-transparent font-bold">
+            <span className="bg-linear-to-r from-[#B23200] via-[#8A2E73] to-[#2F3BD1] bg-clip-text text-transparent font-bold">
               AI-Powered Detection
             </span>
           </h1>
@@ -178,7 +178,7 @@ function HomePage() {
       </section>
 
       {/* Detection Across Every Media Format */}
-      <section className="mx-auto mt-8 max-w-[90rem] px-3 py-14 sm:mt-12 sm:px-4 sm:py-16 lg:px-6">
+      <section className="mx-auto mt-8 max-w-360 px-3 py-14 sm:mt-12 sm:px-4 sm:py-16 lg:px-6">
         <div className="mb-10 text-center">
           <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-[#3860AF] text-white shadow-md shadow-[#6699ff]/20">
             <MousePointerClick className="size-6" />
@@ -222,7 +222,7 @@ function HomePage() {
 
       {/* Works / Steps section */}
       <section className="bg-white border-y border-border/40">
-        <div className="mx-auto max-w-[90rem] px-3 py-14 sm:px-4 sm:py-20 lg:px-6">
+        <div className="mx-auto max-w-360 px-3 py-14 sm:px-4 sm:py-20 lg:px-6">
           <div className="mb-12 text-center">
             <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-[#3860AF] text-white shadow-md">
               <MousePointerClick className="size-6" />
@@ -278,14 +278,14 @@ function HomePage() {
       </section>
 
       {/* Asked Questions */}
-      <section className="mx-auto max-w-[90rem] px-4 py-20 sm:px-6 lg:px-8">
+      <section className="mx-auto max-w-360 px-4 py-20 sm:px-6 lg:px-8">
         <div className="grid gap-12 lg:grid-cols-12 items-start max-w-6xl mx-auto">
           {/* Left Column Heading */}
           <div className="lg:col-span-5 lg:sticky lg:top-32">
             <h2 className="text-4xl font-extrabold tracking-tight text-foreground sm:text-5xl leading-tight">
               Frequently
               <br />
-              <span className="bg-gradient-to-r from-[#B23200] to-[#2F3BD1] bg-clip-text text-transparent">
+              <span className="bg-linear-to-r from-[#B23200] to-[#2F3BD1] bg-clip-text text-transparent">
                 Asked Questions
               </span>
             </h2>
@@ -302,7 +302,7 @@ function HomePage() {
 
       {/* CTA Section */}
       <section className="mx-auto max-w-5xl px-4 pb-24 sm:px-6 lg:px-8">
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#6699ff] to-[#4e88ff] p-7 text-center text-white shadow-xl shadow-[#6699ff]/25 sm:p-12">
+        <div className="relative overflow-hidden rounded-3xl bg-linear-to-br from-[#6699ff] to-[#4e88ff] p-7 text-center text-white shadow-xl shadow-[#6699ff]/25 sm:p-12">
           <div className="relative z-10">
             <h3 className="text-2xl font-bold tracking-tight sm:text-3xl">Ready to verify the truth?</h3>
             <p className="mx-auto mt-3 max-w-xl text-sm text-blue-50/90 sm:text-base">
@@ -332,9 +332,9 @@ function GreyBlockBackground() {
       <div className="absolute right-[14%] top-0 h-28 w-44 bg-slate-100/70" />
       <div className="absolute right-[6%] top-28 h-28 w-28 bg-slate-100/55" />
       <div className="absolute left-0 top-80 h-28 w-28 bg-slate-100/55" />
-      <div className="absolute left-[17%] top-[27rem] h-28 w-36 bg-slate-100/55" />
+      <div className="absolute left-[17%] top-108 h-28 w-36 bg-slate-100/55" />
       <div className="absolute right-[26%] top-80 h-56 w-28 bg-slate-100/60" />
-      <div className="absolute right-[8%] top-[27rem] h-28 w-28 bg-slate-100/60" />
+      <div className="absolute right-[8%] top-108 h-28 w-28 bg-slate-100/60" />
     </div>
   );
 }

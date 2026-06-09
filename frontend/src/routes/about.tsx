@@ -30,7 +30,7 @@ function AboutPage() {
     <SiteLayout>
       {/* Hero Section (unchanged – kept exactly as you wrote) */}
       <section className="bg-[#eef2ff]/40">
-        <div className="mx-auto max-w-[90rem] px-3 pb-12 pt-28 sm:px-4 sm:pt-40 lg:px-6">
+        <div className="mx-auto max-w-360 px-3 pb-12 pt-28 sm:px-4 sm:pt-40 lg:px-6">
           <nav className="flex text-sm text-muted-foreground">
             <Link to="/" className="inline-flex items-center gap-1.5 hover:text-primary">
               <House className="h-4 w-4" />
@@ -52,7 +52,7 @@ function AboutPage() {
           </div>
 
           <div className="mt-10 grid items-start gap-6 md:grid-cols-2">
-            <div className="aspect-[16/10] w-full overflow-hidden rounded-2xl bg-gradient-to-br from-slate-200 to-slate-300">
+            <div className="aspect-16/10 w-full overflow-hidden rounded-2xl bg-linear-to-br from-slate-200 to-slate-300">
               <img
                 src="/images/about-1.png"
                 alt="Media verification illustration left"
@@ -67,7 +67,7 @@ function AboutPage() {
                 Analyse Media
                 <ChevronRight />
               </Link>
-              <div className="aspect-[16/10] w-full overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-900 to-blue-700 md:w-[78%]">
+              <div className="aspect-16/10 w-full overflow-hidden rounded-2xl bg-linear-to-br from-indigo-900 to-blue-700 md:w-[78%]">
                 <img
                   src="/images/about-2.png"
                   alt="Media verification illustration right"
@@ -81,10 +81,10 @@ function AboutPage() {
 
       {/* Our Story */}
       <section className="bg-[#f7f8ff]">
-        <div className="mx-auto grid max-w-[90rem] items-start gap-10 px-3 py-12 sm:px-8 sm:py-14 lg:grid-cols-[1.35fr_0.9fr] lg:px-12">
+        <div className="mx-auto grid max-w-360 items-start gap-10 px-3 py-12 sm:px-8 sm:py-14 lg:grid-cols-[1.35fr_0.9fr] lg:px-12">
           <div>
             <div className="flex items-start gap-3 sm:gap-4">
-              <div className="mt-1 h-[68px] w-4 shrink-0 bg-primary sm:h-[74px] sm:w-[22px]" />
+              <div className="mt-1 h-17 w-4 shrink-0 bg-primary sm:h-18.5 sm:w-5.5" />
               <div>
                 <p className="text-base text-muted-foreground">Our Story</p>
                 <h2 className="mt-1 text-2xl font-semibold leading-tight tracking-tight text-foreground sm:text-[34px]">
@@ -94,7 +94,7 @@ function AboutPage() {
                 </h2>
               </div>
             </div>
-            <p className="mt-6 max-w-[760px] text-base leading-7 text-muted-foreground sm:text-lg sm:leading-8">
+            <p className="mt-6 max-w-190 text-base leading-7 text-muted-foreground sm:text-lg sm:leading-8">
               TruthLens AI is a cybersecurity research initiative built for the{" "}
               <a href="#" className="text-primary hover:underline">
                 Nigeria Computer Society
@@ -105,8 +105,8 @@ function AboutPage() {
             </p>
           </div>
           <div className="flex justify-center pt-0 lg:justify-end lg:pt-1">
-            <div className="relative h-[150px] w-full max-w-[434px] rounded-[10px] bg-primary sm:h-[173px]">
-              <div className="absolute bottom-0 left-5 right-0 top-[25px] overflow-hidden rounded-[8px] bg-gradient-to-br from-slate-900 to-slate-700">
+            <div className="relative h-37.5 w-full max-w-108.5 rounded-[10px] bg-primary sm:h-43.25">
+              <div className="absolute bottom-0 left-5 right-0 top-6.25 overflow-hidden rounded-xl bg-linear-to-br from-slate-900 to-slate-700">
                 <img
                   src="/images/about-3.png"
                   alt="Our story illustration"
@@ -120,20 +120,20 @@ function AboutPage() {
 
       {/* Commitment (Mission / Vision) */}
       <section className="bg-[#f7f8ff]">
-        <div className="mx-auto max-w-[90rem] px-3 pb-12 pt-14 sm:px-8 sm:pb-14 sm:pt-16 lg:px-12">
+        <div className="mx-auto max-w-360 px-3 pb-12 pt-14 sm:px-8 sm:pb-14 sm:pt-16 lg:px-12">
           <div className="text-center">
-            <h2 className="mx-auto max-w-[900px] text-2xl font-medium leading-tight tracking-normal text-foreground sm:text-4xl">
+            <h2 className="mx-auto max-w-225 text-2xl font-medium leading-tight tracking-normal text-foreground sm:text-4xl">
               Commitment to Transparency, Trust, and{" "}
               <span className="text-primary">Digital Authenticity</span> in an
               Increasingly <span className="text-primary">AI-Generated World</span>
             </h2>
-            <p className="mx-auto mt-5 max-w-[680px] text-base leading-snug text-muted-foreground sm:text-lg">
+            <p className="mx-auto mt-5 max-w-170 text-base leading-snug text-muted-foreground sm:text-lg">
               Helping individuals and organizations verify digital content with
               confidence and build trust in the digital world.
             </p>
           </div>
 
-          <div className="mx-auto mt-9 flex max-w-[360px] rounded-full bg-[#f0f0f0] p-2 shadow-sm sm:p-3">
+          <div className="mx-auto mt-9 flex max-w-90 rounded-full bg-[#f0f0f0] p-2 shadow-sm sm:p-3">
             <button
               onClick={() => setTab("mission")}
               className={`flex-1 rounded-full px-4 py-2 text-base font-medium transition sm:px-5 sm:py-2.5 sm:text-lg ${
@@ -188,7 +188,7 @@ function AboutPage() {
       </section>
 
       {/* Our Team */}
-      <section className="mx-auto max-w-[90rem] px-3 py-16 sm:px-4 lg:px-6">
+      <section className="mx-auto max-w-360 px-3 py-16 sm:px-4 lg:px-6">
         <div className="text-center">
           <p className="text-sm font-semibold uppercase tracking-wider text-primary">
             Our Team
@@ -219,7 +219,7 @@ function AboutPage() {
 
       {/* CTA */}
       <section className="mx-auto max-w-5xl px-4 pb-24 sm:px-6 lg:px-8">
-        <div className="rounded-3xl bg-gradient-to-br from-primary to-[#7a92ff] p-7 text-center text-primary-foreground shadow-xl shadow-primary/25 sm:p-10">
+        <div className="rounded-3xl bg-linear-to-br from-primary to-[#7a92ff] p-7 text-center text-primary-foreground shadow-xl shadow-primary/25 sm:p-10">
           <h3 className="text-2xl font-bold sm:text-4xl">
             Ready to verify the truth?
           </h3>

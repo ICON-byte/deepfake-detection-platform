@@ -36,7 +36,7 @@ interface AnalyzeRequestBody {
   url?: string;
   s3Key?: string;
   fileName: string;
-  detectionMode: 'audio' | 'image' | 'video' | 'text' | 'phishing';
+  detectionMode: 'audio' | 'image' | 'video' | 'text';
 }
 
 // ==========================================
@@ -103,11 +103,10 @@ router.post('/analyze', optionalAuth, checkRateLimit, async (
     const isGuest = !req.user;
 
     // 1. Map incoming mode parameter directly to the correct Python FastAPI target endpoint URL
-    let targetEndpoint = 'predict-image'; // fallback default
-    if (detectionMode === 'audio') targetEndpoint = 'predict-audio';
-    else if (detectionMode === 'video') targetEndpoint = 'predict-video';
-    else if (detectionMode === 'text') targetEndpoint = 'predict-text';
-    else if (detectionMode === 'phishing') targetEndpoint = 'predict-phishing';
+    let targetEndpoint = 'predict-council'; // Use council by default for multi-modal synthesis
+    if (detectionMode === 'audio') targetEndpoint = 'predict-council';
+    else if (detectionMode === 'video' || detectionMode === 'image') targetEndpoint = 'predict-council';
+    else if (detectionMode === 'text') targetEndpoint = 'predict-council';
 
     const pythonServerUrl = `${process.env.PYTHON_AI_URL || 'http://localhost:8000'}`;
     
@@ -127,38 +126,31 @@ router.post('/analyze', optionalAuth, checkRateLimit, async (
       }
     }
 
-    console.log(`🤖 Routing token to AI Framework -> [${pythonServerUrl}/${targetEndpoint}]: ${accessUrl}`);
+    console.log(`🤖 [GATEWAY] Routing token to AI Framework -> [${pythonServerUrl}/${targetEndpoint}]`);
+    console.log(`   [ASSET] ${accessUrl.substring(0, 100)}${accessUrl.length > 100 ? '...' : ''}`);
     
+    const gatewayStart = Date.now();
     // 2. Transmit standard payload to target AI engine channel
-    let aiData;
-    let fallbackPerformed = false;
+    const aiResponse = await axios.post(`${pythonServerUrl}/${targetEndpoint}`, { 
+      fileUrl: accessUrl,
+      detectionMode: detectionMode // Ensure detectionMode is passed
+    });
+    const aiData = aiResponse.data;
+    const gatewayDuration = ((Date.now() - gatewayStart) / 1000).toFixed(2);
 
-    try {
-      const payload = detectionMode === 'phishing' ? { url: url || fileUrl } : { fileUrl: accessUrl };
-      const aiResponse = await axios.post(`${pythonServerUrl}/${targetEndpoint}`, payload);
-      aiData = aiResponse.data;
-    } catch (error: any) {
-      // 2b. Fallback Logic: If no face detected, try general synthetic media scan
-      if (error.response && error.response.status === 422 && (detectionMode === 'video' || detectionMode === 'image')) {
-        console.log(`⚠️ No face detected. Falling back to general synthetic scan for ${detectionMode}...`);
-        const fallbackEndpoint = detectionMode === 'video' ? 'predict-synthetic-video' : 'predict-synthetic-image';
-        
-        try {
-          const fallbackResponse = await axios.post(`${pythonServerUrl}/${fallbackEndpoint}`, { fileUrl: accessUrl });
-          aiData = fallbackResponse.data;
-          fallbackPerformed = true;
-        } catch (fallbackError: any) {
-          throw fallbackError; // Re-throw if fallback also fails
-        }
-      } else {
-        throw error;
-      }
+    console.log(`✅ [GATEWAY] AI Response received in ${gatewayDuration}s`);
+    console.log(`   [RESULT] Status: ${aiData.status} | Confidence: ${aiData.confidenceScore || aiData.confidence_score}%`);
+
+    // 3. Normalize state properties
+    const rawStatus = (aiData.status || '').toLowerCase();
+    const confidenceScore = aiData.confidenceScore ?? aiData.confidence_score ?? 0;
+    
+    let mappedStatus: 'Authentic' | 'Manipulated' = 'Authentic';
+    if (rawStatus === 'fake' || rawStatus === 'synthetic' || rawStatus === 'manipulated' || aiData.is_synthetic === true) {
+      mappedStatus = 'Manipulated';
+    } else if (rawStatus === 'conflicted') {
+      mappedStatus = confidenceScore > 50 ? 'Manipulated' : 'Authentic';
     }
-
-    // 3. Normalize state properties: convert Python "Fake" or "Synthetic" to Mongoose "Manipulated"
-    const mappedStatus: 'Authentic' | 'Manipulated' = 
-      (aiData.status && (aiData.status.toLowerCase() === 'fake' || aiData.status.toLowerCase() === 'synthetic')) 
-        ? 'Manipulated' : 'Authentic';
 
     // 4. Record metadata metrics inside database cluster
     const finalizedReport = await ScanHistory.create({
@@ -167,23 +159,25 @@ router.post('/analyze', optionalAuth, checkRateLimit, async (
       fileName,
       s3Url: fileUrl,
       s3Key,
-      confidenceScore: aiData.confidenceScore ?? 0,
+      confidenceScore: confidenceScore,
       status: mappedStatus,
       detectionMode: detectionMode as any,
       analysisBreakdown: {
-        pixelAnalysis: aiData.breakdown?.pixelAnalysis || aiData.breakdown?.textureArtifacts || 0,
-        compression: aiData.breakdown?.compression || aiData.breakdown?.globalCoherence || 0,
-        frequency: aiData.breakdown?.frequency || aiData.breakdown?.frameConsistency || 0,
-        metadata: aiData.breakdown?.metadata ?? 0,
+        // Diversify based on detectionMode
+        pixelAnalysis: aiData.breakdown?.anatomicalAccuracy || aiData.breakdown?.pixelAnalysis || aiData.breakdown?.textureArtifacts || aiData.breakdown?.semanticAnalysis || aiData.breakdown?.urlAnalysis || 0,
+        compression: aiData.breakdown?.lightingConsistency || aiData.breakdown?.vocalConsistency || aiData.breakdown?.compression || aiData.breakdown?.globalCoherence || aiData.breakdown?.stylisticAnalysis || aiData.breakdown?.domainReputation || 0,
+        frequency: aiData.breakdown?.backgroundCoherence || aiData.breakdown?.breathPatterns || aiData.breakdown?.frequency || aiData.breakdown?.frameConsistency || aiData.breakdown?.structuralHeuristics || 0,
+        metadata: aiData.breakdown?.boundaryArtifacts || aiData.breakdown?.backgroundNoise || aiData.breakdown?.metadata || 0,
       }
     });
 
     return res.json({
       success: true,
       data: finalizedReport,
-      fallbackPerformed,
-      message: fallbackPerformed ? 'No facial subjects detected. Performed general synthetic media scan instead.' : undefined
+      analysis_duration: aiData.analysis_duration,
+      message: aiData.rationale || undefined
     });
+
 
   } catch (error: any) {
     // Gracefully catch and handle specific Axios/FastAPI errors (like 422 "No face detected")

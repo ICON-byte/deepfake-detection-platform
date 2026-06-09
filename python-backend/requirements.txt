@@ -17,3 +17,4 @@ tldextract
 numpy
 scipy
 python-dotenv
+google-generativeai

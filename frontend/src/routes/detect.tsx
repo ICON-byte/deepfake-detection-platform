@@ -12,6 +12,8 @@ import {
   File,
   X,
   Lock,
+  Video,
+  Mic,
 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import axios from "axios";
@@ -37,11 +39,20 @@ export const Route = createFileRoute("/detect")({
   component: DetectPage,
 });
 
-type Tab = "deepfake" | "ai" | "phishing";
+type Tab = "deepfake" | "ai";
 
 function DetectPage() {
   const [tab, setTab] = useState<Tab>("deepfake");
   const [showLimitModal, setShowLimitModal] = useState(false);
+  const [authHeaders, setAuthHeaders] = useState<Record<string, string>>({});
+
+  // Initialize auth headers on mount (client-side only)
+  useEffect(() => {
+    const token = localStorage.getItem("truthlens_token");
+    if (token) {
+      setAuthHeaders({ Authorization: `Bearer ${token}` });
+    }
+  }, []);
 
   // Helper hook to check authentication and manage session-based free local usage
   const checkGuestLimitReached = (): boolean => {
@@ -65,12 +76,6 @@ function DetectPage() {
     }
   };
 
-  // Safe Header generator to attach bearer tokens automatically
-  const getAuthHeaders = () => {
-    const token = localStorage.getItem("truthlens_token");
-    return token ? { Authorization: `Bearer ${token}` } : {};
-  };
-
   return (
     <SiteLayout>
       <section className="relative overflow-hidden bg-background">
@@ -78,26 +83,21 @@ function DetectPage() {
         <div className="relative mx-auto max-w-5xl px-3 pb-12 pt-28 sm:px-6 sm:pt-32 lg:px-8">
           <div className="text-center">
             <span className="inline-flex max-w-full items-center gap-2 rounded-full border border-[#6699ff]/30 bg-[#6699ff]/5 px-4 py-1.5 text-sm font-medium text-[#6699ff]">
-              <ShieldCheck className="h-4 w-4" /> Multiple detection workflows for media and
-              suspicious links.
+              <ShieldCheck className="h-4 w-4" /> Multiple detection workflows for media and text.
             </span>
             <h1 className="mt-5 text-3xl font-bold sm:text-5xl">TruthLens Detect</h1>
             <p className="mx-auto mt-4 max-w-2xl text-base text-muted-foreground sm:text-lg">
-              Select a workflow below, then upload files or paste content for real-time deepfake,
-              AI, and phishing analysis.
+              Select a workflow below, then upload files or paste content for real-time deepfake and AI analysis.
             </p>
           </div>
 
           <div className="mx-auto mt-10 max-w-2xl bg-gray-100/60 border border-gray-200/60 p-1 rounded-3xl sm:rounded-full shadow-inner">
-            <div className="grid grid-cols-1 gap-1 sm:grid-cols-3 items-center">
+            <div className="grid grid-cols-1 gap-1 sm:grid-cols-2 items-center">
               <TabBtn active={tab === "deepfake"} onClick={() => setTab("deepfake")}>
                 Deepfake Detect
               </TabBtn>
               <TabBtn active={tab === "ai"} onClick={() => setTab("ai")}>
-                AI Generated Content
-              </TabBtn>
-              <TabBtn active={tab === "phishing"} onClick={() => setTab("phishing")}>
-                Phishing
+                Text AI Detection
               </TabBtn>
             </div>
           </div>
@@ -107,7 +107,7 @@ function DetectPage() {
               <DeepfakePanel 
                 onCheckLimit={checkGuestLimitReached} 
                 onTrackScan={incrementGuestScanCount} 
-                headers={getAuthHeaders()}
+                headers={authHeaders}
                 onTriggerLimitModal={() => setShowLimitModal(true)}
               />
             )}
@@ -115,15 +115,7 @@ function DetectPage() {
               <AiPanel 
                 onCheckLimit={checkGuestLimitReached} 
                 onTrackScan={incrementGuestScanCount} 
-                headers={getAuthHeaders()}
-                onTriggerLimitModal={() => setShowLimitModal(true)}
-              />
-            )}
-            {tab === "phishing" && (
-              <PhishingPanel 
-                onCheckLimit={checkGuestLimitReached} 
-                onTrackScan={incrementGuestScanCount} 
-                headers={getAuthHeaders()}
+                headers={authHeaders}
                 onTriggerLimitModal={() => setShowLimitModal(true)}
               />
             )}
@@ -266,13 +258,24 @@ function DeepfakePanel({ onCheckLimit, onTrackScan, headers, onTriggerLimitModal
   }, [previewUrl]);
 
   const handleFileSelect = async (selectedFile: File | null) => {
-    if (selectedFile && selectedFile.type.startsWith("image/")) {
-      if (onCheckLimit()) return;
-      setFile(selectedFile);
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
-      setPreviewUrl(URL.createObjectURL(selectedFile));
-    } else if (selectedFile) {
-      alert("Please select a valid image file (JPEG, PNG, WEBP)");
+    if (selectedFile) {
+      const isImage = selectedFile.type.startsWith("image/");
+      const isVideo = selectedFile.type.startsWith("video/");
+      const isAudio = selectedFile.type.startsWith("audio/");
+
+      if (isImage || isVideo || isAudio) {
+        if (onCheckLimit()) return;
+        setFile(selectedFile);
+        if (previewUrl) URL.revokeObjectURL(previewUrl);
+        
+        if (isImage) {
+          setPreviewUrl(URL.createObjectURL(selectedFile));
+        } else {
+          setPreviewUrl(null); // No preview for video/audio in this simple view
+        }
+      } else {
+        alert("Please select a valid image, video, or audio file.");
+      }
     }
   };
 
@@ -302,17 +305,22 @@ function DeepfakePanel({ onCheckLimit, onTrackScan, headers, onTriggerLimitModal
     setStatusMessage("Requesting secure upload verification signature...");
 
     try {
+      const isImage = file.type.startsWith("image/");
+      const isVideo = file.type.startsWith("video/");
+      const isAudio = file.type.startsWith("audio/");
+      const mode = isAudio ? "audio" : (isVideo ? "video" : "image");
+
       // Phase 1: Call gateway to acquire AWS Presigned Upload Target
       const presignResponse = await axios.post(
         `${API_BASE_URL}/detection/request-upload`,
-        { fileName: file.name, fileType: file.type, mode: "image" },
+        { fileName: file.name, fileType: file.type, mode: mode },
         { headers }
       );
 
       const { presignedUrl, s3Key, fileUrl } = presignResponse.data;
 
       // Phase 2: Upload direct payload binary straight to the S3 bucket node
-      setStatusMessage("Uploading asset securely to AWS S3 storage vault...");
+      setStatusMessage(`Uploading ${mode} securely to AWS S3 storage vault...`);
       setProgress(25);
 
       await axios.put(presignedUrl, file, {
@@ -326,12 +334,12 @@ function DeepfakePanel({ onCheckLimit, onTrackScan, headers, onTriggerLimitModal
       });
 
       // Phase 3: Submit asset mapping indexes down into Python architecture
-      setStatusMessage("Analyzing facial biometrics & pixel anomalies...");
+      setStatusMessage(`Analyzing ${mode} biometrics & artifacts...`);
       setProgress(75);
 
       const analysisResponse = await axios.post(
         `${API_BASE_URL}/detection/analyze`,
-        { fileUrl, s3Key, fileName: file.name, detectionMode: "image" },
+        { fileUrl, s3Key, fileName: file.name, detectionMode: mode },
         { headers }
       );
 
@@ -340,6 +348,7 @@ function DeepfakePanel({ onCheckLimit, onTrackScan, headers, onTriggerLimitModal
       setIsProcessing(false);
 
       const report = analysisResponse.data.data;
+      const duration = analysisResponse.data.analysis_duration || report.analysis_duration;
 
       navigate({
         to: "/result",
@@ -348,11 +357,12 @@ function DeepfakePanel({ onCheckLimit, onTrackScan, headers, onTriggerLimitModal
           data: {
             isDeepfake: report.status === "Manipulated",
             confidence: report.confidenceScore / 100,
+            analysisDuration: duration,
             details:
               analysisResponse.data.message ||
               (report.status === "Manipulated"
-                ? "Multiple manipulation traces detected including inconsistent lighting and warped facial features."
-                : "No significant deepfake patterns found. Image appears authentic."),
+                ? "Multiple manipulation traces detected across the multi-modal neural scan."
+                : "No significant deepfake patterns found. Media appears authentic."),
           },
           fileName: file.name,
           timestamp: new Date().toISOString(),
@@ -371,9 +381,9 @@ function DeepfakePanel({ onCheckLimit, onTrackScan, headers, onTriggerLimitModal
   };
 
   return (
-    <PanelCard title="Deepfake Detection" icon={<Image className="h-5 w-5" />}>
+    <PanelCard title="Deepfake Detection" icon={<ShieldCheck className="h-5 w-5" />}>
       <p className="mt-2 text-sm text-muted-foreground">
-        Upload an image to detect AI-manipulated faces, GAN artifacts, and synthetic alterations.
+        Upload image, video, or audio to detect AI-manipulated faces, voice cloning, and synthetic alterations.
       </p>
 
       <div
@@ -403,13 +413,23 @@ function DeepfakePanel({ onCheckLimit, onTrackScan, headers, onTriggerLimitModal
             </div>
             <p className="text-xs text-muted-foreground">{Math.round(progress)}%</p>
           </div>
-        ) : file && previewUrl ? (
+        ) : file ? (
           <div className="flex flex-col items-center gap-3">
-            <img
-              src={previewUrl}
-              alt="Uploaded file preview"
-              className="max-h-32 max-w-full rounded-lg object-contain shadow-sm"
-            />
+            {previewUrl ? (
+              <img
+                src={previewUrl}
+                alt="Uploaded file preview"
+                className="max-h-32 max-w-full rounded-lg object-contain shadow-sm"
+              />
+            ) : (
+              <div className="p-4 rounded-full bg-[#6699ff]/10">
+                {file.type.startsWith("video/") ? (
+                  <Video className="h-10 w-10 text-[#6699ff]" />
+                ) : (
+                  <Mic className="h-10 w-10 text-[#6699ff]" />
+                )}
+              </div>
+            )}
             <div>
               <p className="text-base font-medium">{file.name}</p>
               <p className="text-sm text-muted-foreground">
@@ -420,7 +440,7 @@ function DeepfakePanel({ onCheckLimit, onTrackScan, headers, onTriggerLimitModal
         ) : (
           <>
             <UploadCloud className="h-8 w-8 text-[#6699ff]" />
-            <p className="mt-3 text-base font-medium">Drag & Drop Image to Scan</p>
+            <p className="mt-3 text-base font-medium">Drag & Drop Media to Scan</p>
             <p className="mt-1 text-sm text-muted-foreground">
               Or <span className="text-[#6699ff] underline">browse files</span>
             </p>
@@ -429,16 +449,16 @@ function DeepfakePanel({ onCheckLimit, onTrackScan, headers, onTriggerLimitModal
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/jpeg,image/png,image/webp"
+          accept="image/*,video/*,audio/*"
           className="hidden"
           id="deepfake-file-input"
-          aria-label="Choose an image file to analyze for deepfakes"
+          aria-label="Choose a media file to analyze for deepfakes"
           onChange={(e) => handleFileSelect(e.target.files?.[0] || null)}
           disabled={isProcessing}
         />
       </div>
       <div className="mt-3 flex flex-col gap-1 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-        <span>Supported Formats: JPEG, PNG, WEBP</span>
+        <span>Supported: JPG, PNG, MP4, MOV, MP3, WAV</span>
         <span>Max file size: 100MB</span>
       </div>
 
@@ -457,479 +477,148 @@ function DeepfakePanel({ onCheckLimit, onTrackScan, headers, onTriggerLimitModal
 // ======================= AI CONTENT PANEL (PRODUCTION AWS PIPELINE) =======================
 function AiPanel({ onCheckLimit, onTrackScan, headers, onTriggerLimitModal }: PanelProps) {
   const navigate = useNavigate();
-  const [mode, setMode] = useState<"file" | "text">("file");
-  const [file, setFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [textContent, setTextContent] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
-  const [isDragging, setIsDragging] = useState(false);
   const [progress, setProgress] = useState(0);
   const [statusMessage, setStatusMessage] = useState("");
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    return () => {
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
-    };
-  }, [previewUrl]);
-
-  const handleFileSelect = async (selectedFile: File | null) => {
-    if (
-      selectedFile &&
-      (selectedFile.type.startsWith("image/") ||
-        selectedFile.type.startsWith("video/") ||
-        selectedFile.type === "text/plain")
-    ) {
-      if (onCheckLimit()) return;
-      setFile(selectedFile);
-      if (selectedFile.type.startsWith("image/")) {
-        if (previewUrl) URL.revokeObjectURL(previewUrl);
-        setPreviewUrl(URL.createObjectURL(selectedFile));
-      } else {
-        setPreviewUrl(null);
-      }
-    } else if (selectedFile) {
-      alert("Please select an image, video, or text file (.txt)");
-    }
-  };
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    if (!isProcessing && mode === "file") setIsDragging(true);
-  };
-
-  const handleDragLeave = () => {
-    setIsDragging(false);
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-    if (isProcessing || mode !== "file") return;
-    const droppedFile = e.dataTransfer.files?.[0] || null;
-    handleFileSelect(droppedFile);
-  };
-
-  const resetAnalysis = () => {
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
-    setFile(null);
-    setPreviewUrl(null);
-    setTextContent("");
-    setProgress(0);
-    setStatusMessage("");
-    setIsProcessing(false);
-    if (fileInputRef.current) fileInputRef.current.value = "";
-  };
 
   const executePipeline = async () => {
+    if (!textContent.trim() || textContent.length < 50) {
+      alert("Please enter at least 50 characters for a meaningful linguistic audit.");
+      return;
+    }
     if (onCheckLimit()) return;
+
     setIsProcessing(true);
     setProgress(5);
+    setStatusMessage("Initializing linguistic forensic environment...");
 
     try {
-      if (mode === "file" && file) {
-        setStatusMessage("Requesting binary file upload parameters...");
-        
-        const presignResponse = await axios.post(
-          `${API_BASE_URL}/detection/request-upload`,
-          { fileName: file.name, fileType: file.type, mode: file.type.startsWith("video/") ? "video" : "image" },
-          { headers }
-        );
+      // Phase 1: Request S3 Target for the text audit log
+      const presignResponse = await axios.post(
+        `${API_BASE_URL}/detection/request-upload`,
+        { fileName: "audit_input.txt", fileType: "text/plain", mode: "text" },
+        { headers }
+      );
 
-        const { presignedUrl, s3Key, fileUrl } = presignResponse.data;
+      const { presignedUrl, s3Key, fileUrl } = presignResponse.data;
 
-        setStatusMessage("Streaming document payload to cloud servers...");
-        setProgress(30);
+      // Phase 2: Upload raw text to the secure vault
+      setStatusMessage("Uploading text content to secure forensic vault...");
+      setProgress(30);
 
-        await axios.put(presignedUrl, file, {
-          headers: { "Content-Type": file.type },
-          onUploadProgress: (progressEvent) => {
-            if (progressEvent.total) {
-              const percentage = Math.round((progressEvent.loaded * 40) / progressEvent.total);
-              setProgress(30 + percentage);
-            }
-          }
-        });
+      await axios.put(presignedUrl, textContent, {
+        headers: { "Content-Type": "text/plain" }
+      });
 
-        setStatusMessage("Executing generative structural classification check...");
-        setProgress(80);
+      // Phase 3: Execute the Text Council deliberation
+      setStatusMessage("Executing deep linguistic pattern analysis...");
+      setProgress(70);
 
-        const analysisResponse = await axios.post(
-          `${API_BASE_URL}/detection/analyze`,
-          { 
-            fileUrl, 
-            s3Key, 
-            fileName: file.name, 
-            detectionMode: file.type.startsWith("video/") ? "video" : "image" 
-          },
-          { headers }
-        );
-
-        setProgress(100);
-        onTrackScan();
-        setIsProcessing(false);
-
-        const report = analysisResponse.data.data;
-
-        navigate({
-          to: "/result",
-          search: { 
-            type: "ai", 
-            data: {
-              isAIGenerated: report.status === "Manipulated",
-              confidence: report.confidenceScore / 100,
-              details: analysisResponse.data.message || (report.status === "Manipulated" 
-                ? "Synthetic artifacts detected consistent with AI generation." 
-                : "Likely human-created content."),
-            }, 
-            fileName: file.name, 
-            timestamp: new Date().toISOString() 
-          }
-        });
-
-      } else if (mode === "text" && textContent.trim()) {
-        setStatusMessage("Processing text input...");
-        setProgress(10);
-
-        // Upload text to S3 as a file first, as backend analyze expects a pointer
-        const presignResponse = await axios.post(
-          `${API_BASE_URL}/detection/request-upload`,
-          { fileName: "text_input.txt", fileType: "text/plain", mode: "text" },
-          { headers }
-        );
-
-        const { presignedUrl, s3Key, fileUrl } = presignResponse.data;
-
-        setStatusMessage("Uploading text to secure vault...");
-        setProgress(30);
-
-        await axios.put(presignedUrl, textContent, {
-          headers: { "Content-Type": "text/plain" }
-        });
-
-        setStatusMessage("Evaluating custom textual patterns...");
-        setProgress(70);
-
-        const analysisResponse = await axios.post(
-          `${API_BASE_URL}/detection/analyze`,
-          { 
-            fileUrl, 
-            s3Key, 
-            fileName: "text_input.txt", 
-            detectionMode: "text" 
-          },
-          { headers }
-        );
-
-        setProgress(100);
-        onTrackScan();
-        setIsProcessing(false);
-
-        const report = analysisResponse.data.data;
-
-        navigate({
-          to: "/result",
-          search: { 
-            type: "ai", 
-            data: {
-              isAIGenerated: report.status === "Manipulated",
-              confidence: report.confidenceScore / 100,
-              details: analysisResponse.data.message || (report.status === "Manipulated" 
-                ? "Synthetic patterns detected in text structure." 
-                : "Text appears human-written."),
-            }, 
-            fileName: "Text Analysis", 
-            timestamp: new Date().toISOString() 
-          }
-        });
-      }
-    } catch (err: any) {
-      setIsProcessing(false);
-      setProgress(0);
-      if (err?.response?.status === 429) {
-        onTriggerLimitModal();
-      } else {
-        alert(err?.response?.data?.message || "Pipeline integration fault.");
-      }
-    }
-  };
-
-  return (
-    <PanelCard title="AI Generated Content Scan" icon={<FileCode2 className="h-5 w-5" />}>
-      <p className="mt-2 text-sm text-muted-foreground">
-        Detect synthetic media and AI-written text using advanced pattern recognition.
-      </p>
-
-      <div className="mt-4 inline-flex bg-gray-100/60 border border-gray-200/60 p-1 rounded-full shadow-inner max-w-xs w-full">
-        <div className="grid grid-cols-2 gap-1 w-full items-center">
-          <button
-            onClick={() => {
-              setMode("file");
-              resetAnalysis();
-            }}
-            className={`py-2 px-4 text-xs font-medium rounded-full transition-all duration-200 select-none ${
-              mode === "file"
-                ? "bg-[#6699ff] text-white shadow-sm"
-                : "text-gray-500 hover:text-gray-800 bg-transparent"
-            }`}
-          >
-            File Upload
-          </button>
-          <button
-            onClick={() => {
-              setMode("text");
-              resetAnalysis();
-            }}
-            className={`py-2 px-4 text-xs font-medium rounded-full transition-all duration-200 select-none ${
-              mode === "text"
-                ? "bg-[#6699ff] text-white shadow-sm"
-                : "text-gray-500 hover:text-gray-800 bg-transparent"
-            }`}
-          >
-            Text Input
-          </button>
-        </div>
-      </div>
-
-      {mode === "file" ? (
-        <>
-          <div
-            className={`mt-5 flex min-h-52 cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed transition-all ${
-              isProcessing
-                ? "border-[#6699ff]/40 bg-[#6699ff]/5"
-                : isDragging
-                ? "border-[#6699ff] bg-[#6699ff]/20 scale-[0.99]"
-                : file
-                  ? "border-[#6699ff]/70 bg-[#6699ff]/15"
-                  : "border-[#6699ff]/40 bg-[#6699ff]/10 hover:border-[#6699ff]/70 hover:bg-[#6699ff]/15"
-            } px-4 py-8 text-center`}
-            onClick={() => !isProcessing && fileInputRef.current?.click()}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-          >
-            {isProcessing ? (
-              <div className="flex flex-col items-center gap-3">
-                <Loader2 className="h-10 w-10 animate-spin text-[#6699ff]" />
-                <p className="text-sm font-medium text-[#6699ff]">{statusMessage}</p>
-                <div className="w-48 h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-[#6699ff] transition-all duration-300"
-                    style={{ width: `${progress}%` }}
-                  />
-                </div>
-                <p className="text-xs text-muted-foreground">{Math.round(progress)}%</p>
-              </div>
-            ) : file ? (
-              <div className="flex flex-col items-center gap-3">
-                {previewUrl ? (
-                  <img
-                    src={previewUrl}
-                    alt="Uploaded image preview"
-                    className="max-h-32 max-w-full rounded-lg object-contain shadow-sm"
-                  />
-                ) : (
-                  <File className="h-12 w-12 text-[#6699ff]" />
-                )}
-                <div>
-                  <p className="text-base font-medium">{file.name}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {(file.size / 1024 / 1024).toFixed(2)} MB
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <>
-                <UploadCloud className="h-8 w-8 text-[#6699ff]" />
-                <p className="mt-3 text-base font-medium">Upload Media or Text File</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Or <span className="text-[#6699ff] underline">browse files</span>
-                </p>
-              </>
-            )}
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*,text/plain"
-              className="hidden"
-              id="ai-file-input"
-              aria-label="Upload an image or text file for AI content analysis"
-              onChange={(e) => handleFileSelect(e.target.files?.[0] || null)}
-              disabled={isProcessing}
-            />
-          </div>
-          <div className="mt-3 text-sm text-muted-foreground">
-            Supported: Images (JPG, PNG, WEBP) or .txt files
-          </div>
-        </>
-      ) : (
-        <>
-          {isProcessing ? (
-            <div className="mt-5 flex min-h-52 flex-col items-center justify-center rounded-xl border-2 border-dashed border-[#6699ff]/40 bg-[#6699ff]/5 px-4 py-8 text-center">
-              <Loader2 className="h-10 w-10 animate-spin text-[#6699ff]" />
-              <p className="mt-2 text-sm font-medium text-[#6699ff]">{statusMessage}</p>
-              <div className="mt-3 w-48 h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-[#6699ff] transition-all duration-300"
-                  style={{ width: `${progress}%` }}
-                />
-              </div>
-              <p className="mt-1 text-xs text-muted-foreground">{Math.round(progress)}%</p>
-            </div>
-          ) : (
-            <textarea
-              id="ai-text-input"
-              rows={6}
-              value={textContent}
-              onChange={(e) => setTextContent(e.target.value)}
-              placeholder="Paste any text you suspect was generated by AI (e.g., ChatGPT, Claude, Gemini)..."
-              className="mt-4 w-full rounded-xl border border-input bg-background p-4 text-base outline-none focus:border-[#6699ff] focus:ring-2 focus:ring-[#6699ff]/20"
-              disabled={isProcessing}
-              aria-label="Paste suspect text content here"
-            />
-          )}
-        </>
-      )}
-
-      {((mode === "file" && file) || (mode === "text" && textContent.trim())) && !isProcessing && (
-        <button
-          onClick={executePipeline}
-          className="mt-5 rounded-full bg-[#6699ff] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[#6699ff]/90 transition-all"
-        >
-          Analyze Content
-        </button>
-      )}
-    </PanelCard>
-  );
-}
-
-// ======================= PHISHING PANEL (PRODUCTION ENDPOINT DISPATCH) =======================
-function PhishingPanel({ onCheckLimit, onTrackScan, headers, onTriggerLimitModal }: PanelProps) {
-  const navigate = useNavigate();
-  const [url, setUrl] = useState("");
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [statusMessage, setStatusMessage] = useState("");
-
-  const resetAnalysis = () => {
-    setUrl("");
-    setProgress(0);
-    setStatusMessage("");
-    setIsAnalyzing(false);
-  };
-
-  const handleUrlScan = async () => {
-    if (!url.trim()) return;
-    if (onCheckLimit()) return;
-
-    setIsAnalyzing(true);
-    setProgress(20);
-    setStatusMessage("Querying domain reputation systems...");
-
-    try {
-      // Use the unified analyze endpoint with detectionMode: 'phishing'
-      const response = await axios.post(
+      const analysisResponse = await axios.post(
         `${API_BASE_URL}/detection/analyze`,
         { 
-          url, 
-          fileName: url, 
-          detectionMode: "phishing" 
+          fileUrl, 
+          s3Key, 
+          fileName: "Linguistic Audit Log", 
+          detectionMode: "text" 
         },
         { headers }
       );
 
       setProgress(100);
       onTrackScan();
-      setIsAnalyzing(false);
+      setIsProcessing(false);
 
-      const report = response.data.data;
-      const confidence = report.confidenceScore / 100;
+      const report = analysisResponse.data.data;
+      const duration = analysisResponse.data.analysis_duration || report.analysis_duration;
 
       navigate({
         to: "/result",
-        search: {
-          type: "phishing",
+        search: { 
+          type: "ai", 
           data: {
-            isMalicious: report.status === "Manipulated",
-            confidence: Math.min(confidence, 0.98),
-            details: report.status === "Manipulated"
-              ? "This URL exhibits phishing characteristics: domain impersonation, suspicious redirects, and deceptive path structure."
-              : "No obvious phishing patterns detected. Domain appears legitimate based on preliminary heuristics.",
-            riskLevel: confidence > 0.8 ? "high" : "low",
-            url,
-          },
-          fileName: url,
-          timestamp: new Date().toISOString(),
-        },
+            isAIGenerated: report.status === "Manipulated",
+            confidence: report.confidenceScore / 100,
+            analysisDuration: duration,
+            details: analysisResponse.data.message || (report.status === "Manipulated" 
+              ? "Syntactic patterns and uniform perplexity consistent with LLM generation detected." 
+              : "Linguistic variation and structural entropy match human authorship signatures."),
+          }, 
+          fileName: "Linguistic Audit", 
+          timestamp: new Date().toISOString() 
+        }
       });
-    } catch (err: any) {
-      setIsAnalyzing(false);
-      setProgress(0);
 
+    } catch (err: any) {
+      setIsProcessing(false);
+      setProgress(0);
       if (err?.response?.status === 429) {
         onTriggerLimitModal();
       } else {
-        alert(err?.response?.data?.message || "URL lookup failed.");
+        alert(err?.response?.data?.message || "Linguistic engine pipeline fault.");
       }
     }
   };
 
   return (
-    <PanelCard title="Phishing & Malicious Link Analysis" icon={<Link2 className="h-5 w-5" />}>
+    <PanelCard title="Text AI Detection" icon={<FileText className="h-5 w-5" />}>
       <p className="mt-2 text-sm text-muted-foreground">
-        Submit a suspicious URL for instant risk assessment and threat intelligence check.
+        Paste an essay, article, or message to detect signatures from ChatGPT, Claude, and Gemini using linguistic forensics.
       </p>
 
-      <label
-        htmlFor="phishing-url"
-        className="mt-4 block text-sm font-medium text-muted-foreground"
-      >
-        URL Link
-      </label>
-      <div className="mt-2 flex items-center gap-2 rounded-xl border border-input bg-background px-3 py-2">
-        <FileText className="h-4 w-4 text-muted-foreground" />
-        <input
-          id="phishing-url"
-          type="url"
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          placeholder="https://example-login.verify-account.com"
-          className="w-full bg-transparent text-base outline-none placeholder:text-muted-foreground"
-          disabled={isAnalyzing}
-        />
-      </div>
-
-      <div className="mt-4 flex flex-wrap gap-2">
-        <button
-          onClick={handleUrlScan}
-          disabled={!url.trim() || isAnalyzing}
-          className="rounded-full bg-[#6699ff] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#6699ff]/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-        >
-          {isAnalyzing ? "Analyzing..." : "Analyze URL"}
-        </button>
-        <button
-          onClick={resetAnalysis}
-          className="inline-flex items-center gap-1 rounded-full border border-input bg-background px-5 py-2.5 text-sm font-medium hover:bg-secondary transition-all"
-        >
-          <RotateCcw className="h-3 w-3" /> Reset
-        </button>
-      </div>
-
-      {isAnalyzing && (
-        <div className="mt-5 space-y-2">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin text-[#6699ff]" />
-            <span>{statusMessage}</span>
-          </div>
-          <div className="h-2 w-full overflow-hidden rounded-full bg-gray-200">
+      {isProcessing ? (
+        <div className="mt-5 flex min-h-52 flex-col items-center justify-center rounded-xl border-2 border-dashed border-[#6699ff]/40 bg-[#6699ff]/5 px-4 py-8 text-center">
+          <Loader2 className="h-10 w-10 animate-spin text-[#6699ff]" />
+          <p className="mt-2 text-sm font-medium text-[#6699ff]">{statusMessage}</p>
+          <div className="mt-3 w-48 h-1.5 bg-gray-200 rounded-full overflow-hidden">
             <div
               className="h-full bg-[#6699ff] transition-all duration-300"
               style={{ width: `${progress}%` }}
             />
           </div>
-          <p className="text-right text-xs text-muted-foreground">{Math.round(progress)}%</p>
+          <p className="mt-1 text-xs text-muted-foreground">{Math.round(progress)}%</p>
+        </div>
+      ) : (
+        <div className="relative">
+          <textarea
+            id="ai-text-input"
+            rows={8}
+            value={textContent}
+            onChange={(e) => setTextContent(e.target.value)}
+            placeholder="Paste suspect text content here (min 50 characters)..."
+            className="mt-5 w-full rounded-xl border border-input bg-background p-5 text-base outline-none focus:border-[#6699ff] focus:ring-4 focus:ring-[#6699ff]/10 transition-all font-sans leading-relaxed resize-none shadow-inner"
+            disabled={isProcessing}
+            aria-label="Paste suspect text content here"
+          />
+          <div className="absolute bottom-4 right-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+            {textContent.length} Characters
+          </div>
+        </div>
+      )}
+
+      {textContent.trim().length >= 50 && !isProcessing && (
+        <div className="mt-5 flex items-center justify-between">
+          <div className="flex gap-4">
+            <div className="flex items-center gap-1.5">
+              <div className="h-1.5 w-1.5 rounded-full bg-[#6699ff]" />
+              <span className="text-[10px] font-black uppercase text-slate-500">Perplexity</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="h-1.5 w-1.5 rounded-full bg-[#6699ff]" />
+              <span className="text-[10px] font-black uppercase text-slate-500">Burstiness</span>
+            </div>
+          </div>
+          <button
+            onClick={executePipeline}
+            className="rounded-full bg-[#6699ff] px-8 py-3 text-sm font-bold text-white shadow-lg hover:bg-[#5588ee] hover:shadow-[#6699ff]/25 transition-all cursor-pointer"
+          >
+            Run Linguistic Audit
+          </button>
         </div>
       )}
     </PanelCard>
   );
 }
+
+

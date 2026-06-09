@@ -54,8 +54,10 @@ export const Route = createFileRoute("/history")({
   }),
   loader: async (): Promise<HistoryItem[]> => {
     try {
+      // Use absolute URL for SSR compatibility
+      const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
       // Pointing directly to your clean history API entrypoint
-      const response = await fetch("/api/history");
+      const response = await fetch(`${apiUrl}/history`);
       if (!response.ok) {
         throw new Error("Failed to fetch history from database");
       }
@@ -192,7 +194,7 @@ function HistoryPage() {
             <HistoryIcon className="h-3 w-3" /> Complete analysis archive
           </span>
           <h1 className="mt-5 text-3xl font-bold sm:text-4xl">
-            Analysis <span className="bg-gradient-to-r from-[#B23200] to-[#251FBA] bg-clip-text text-transparent">History</span>
+            Analysis <span className="bg-linear-to-r from-[#B23200] to-[#251FBA] bg-clip-text text-transparent">History</span>
           </h1>
           <p className="mx-auto mt-3 max-w-xl text-sm text-muted-foreground">
             Review past deepfake, AI-generated content, and phishing analyses with detailed results and confidence scores.
