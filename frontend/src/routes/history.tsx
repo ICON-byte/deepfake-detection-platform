@@ -6,24 +6,20 @@ import {
   FileText,
   Video,
   Image as ImageIcon,
-  Sparkles,
-  ShieldAlert,
   CheckCircle2,
   XCircle,
-  AlertTriangle,
   Eye,
   Trash2,
   RotateCcw,
   Search,
   UploadCloud,
   ChevronRight,
-  AlertCircle,
   Volume2
 } from "lucide-react";
 import React, { useState } from "react";
 
-type DetectionType = "deepfake" | "aigen" | "phishing";
-type ResultStatus = "real" | "manipulated" | "suspicious" | "phishing";
+type DetectionType = "deepfake" | "text";
+type ResultStatus = "real" | "manipulated";
 
 interface HistoryItem {
   id: string;
@@ -43,7 +39,7 @@ export const Route = createFileRoute("/history")({
       { title: "History · TruthLens" },
       {
         name: "description",
-        content: "Review past deepfake, AI-generated content, and phishing analyses.",
+        content: "Review past deepfake and AI text detection analyses.",
       },
       { property: "og:title", content: "TruthLens History" },
       {
@@ -54,9 +50,7 @@ export const Route = createFileRoute("/history")({
   }),
   loader: async (): Promise<HistoryItem[]> => {
     try {
-      // Use absolute URL for SSR compatibility
       const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
-      // Pointing directly to your clean history API entrypoint
       const response = await fetch(`${apiUrl}/history`);
       if (!response.ok) {
         throw new Error("Failed to fetch history from database");
@@ -64,14 +58,13 @@ export const Route = createFileRoute("/history")({
       return await response.json();
     } catch (error) {
       console.error("Database connection error:", error);
-      return []; // Return empty fallback array on error
+      return []; 
     }
   },
   component: HistoryPage,
 });
 
 function HistoryPage() {
-  // 2. Consume the synchronized server-side data from TanStack router loader
   const initialData = Route.useLoaderData();
   const router = useRouter();
 
@@ -79,7 +72,6 @@ function HistoryPage() {
   const [filterType, setFilterType] = useState<DetectionType | "all">("all");
   const [searchQuery, setSearchQuery] = useState("");
 
-  // 3. Sync deletions back to the MongoDB collections via API
   const handleDelete = async (id: string) => {
     if (window.confirm("Are you sure you want to delete this analysis from history?")) {
       try {
@@ -89,7 +81,7 @@ function HistoryPage() {
 
         if (response.ok) {
           setHistoryItems((prev) => prev.filter((item) => item.id !== id));
-          router.invalidate(); // Tell router to refresh data cache
+          router.invalidate(); 
         } else {
           alert("Failed to delete the record from database.");
         }
@@ -125,24 +117,18 @@ function HistoryPage() {
   });
 
   const getTypeIcon = (type: DetectionType, filename: string) => {
+    if (type === "text") {
+      return <FileText className="h-4 w-4" />;
+    }
+    
     const ext = filename.split(".").pop()?.toLowerCase();
-    
-    if (type === "deepfake") {
-      if (ext && ["mp3", "wav", "m4a", "ogg", "flac"].includes(ext)) {
-        return <Volume2 className="h-4 w-4" />;
-      }
-      if (ext && ["png", "jpg", "jpeg", "webp"].includes(ext)) {
-        return <ImageIcon className="h-4 w-4" />;
-      }
-      return <Video className="h-4 w-4" />;
+    if (ext && ["mp3", "wav", "m4a", "ogg", "flac"].includes(ext)) {
+      return <Volume2 className="h-4 w-4" />;
     }
-    
-    switch (type) {
-      case "aigen":
-        return <Sparkles className="h-4 w-4" />;
-      case "phishing":
-        return <ShieldAlert className="h-4 w-4" />;
+    if (ext && ["png", "jpg", "jpeg", "webp"].includes(ext)) {
+      return <ImageIcon className="h-4 w-4" />;
     }
+    return <Video className="h-4 w-4" />;
   };
 
   const getStatusBadge = (status: ResultStatus) => {
@@ -159,23 +145,7 @@ function HistoryPage() {
             <XCircle className="h-3 w-3" /> Manipulated
           </span>
         );
-      case "suspicious":
-        return (
-          <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium text-yellow-700 dark:text-yellow-400">
-            <AlertTriangle className="h-3 w-3" /> Suspicious
-          </span>
-        );
-      case "phishing":
-        return (
-          <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium text-red-700 dark:text-red-400">
-            <AlertCircle className="h-3 w-3" /> Phishing
-          </span>
-        );
     }
-  };
-
-  const getConfidenceColor = (_confidence: number) => {
-    return "text-black dark:text-white";
   };
 
   const formatDate = (dateStr: string) => {
@@ -197,7 +167,7 @@ function HistoryPage() {
             Analysis <span className="bg-linear-to-r from-[#B23200] to-[#251FBA] bg-clip-text text-transparent">History</span>
           </h1>
           <p className="mx-auto mt-3 max-w-xl text-sm text-muted-foreground">
-            Review past deepfake, AI-generated content, and phishing analyses with detailed results and confidence scores.
+            Review past deepfake and AI text analysis logs with granular confidence assessments.
           </p>
         </div>
 
@@ -206,8 +176,7 @@ function HistoryPage() {
           <div className="flex flex-wrap gap-2 rounded-full border border-border/70 bg-card p-1">
             <FilterBtn active={filterType === "all"} onClick={() => setFilterType("all")}>All</FilterBtn>
             <FilterBtn active={filterType === "deepfake"} onClick={() => setFilterType("deepfake")}>Deepfake</FilterBtn>
-            <FilterBtn active={filterType === "aigen"} onClick={() => setFilterType("aigen")}>AI Content</FilterBtn>
-            <FilterBtn active={filterType === "phishing"} onClick={() => setFilterType("phishing")}>Phishing</FilterBtn>
+            <FilterBtn active={filterType === "text"} onClick={() => setFilterType("text")}>AI Text</FilterBtn>
           </div>
 
           <div className="flex items-center gap-3">
@@ -215,7 +184,7 @@ function HistoryPage() {
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <input
                 type="text"
-                placeholder="Search files & URLs..."
+                placeholder="Search files & entries..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="h-9 rounded-full border border-border/70 bg-background pl-9 pr-4 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary"
@@ -266,7 +235,7 @@ function HistoryPage() {
                         {getTypeIcon(item.type, item.mediaName)}
                       </div>
                       <span className="text-xs font-medium capitalize text-muted-foreground">
-                        {item.type === "aigen" ? "AI Content" : item.type}
+                        {item.type === "text" ? "AI Text" : item.type}
                       </span>
                     </div>
                     {getStatusBadge(item.status)}
@@ -286,7 +255,7 @@ function HistoryPage() {
                       <CalendarDays className="h-3.5 w-3.5" />
                       <span>{formatDate(item.date)}</span>
                     </div>
-                    <div className={`font-semibold ${getConfidenceColor(item.confidence)}`}>
+                    <div className="font-semibold text-black dark:text-white">
                       {item.confidence}% confidence
                     </div>
                   </div>

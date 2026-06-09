@@ -22,7 +22,7 @@ function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [formData, setFormData] = useState({
-    fullname: "",
+    fullName: "",
     email: "",
     password: "",
     confirmPassword: "",
@@ -40,7 +40,7 @@ function RegisterPage() {
     e.preventDefault();
 
     // Client-side validation
-    if (!formData.fullname || !formData.email || !formData.password) {
+    if (!formData.fullName || !formData.email || !formData.password) {
       setError("Please fill in all required fields.");
       return;
     }
@@ -63,7 +63,7 @@ function RegisterPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          fullname: formData.fullname,
+          fullName: formData.fullName,
           email: formData.email,
           password: formData.password,
         }),
@@ -147,8 +147,8 @@ function RegisterPage() {
                   </svg>
                   <input
                     type="text"
-                    name="fullname"
-                    value={formData.fullname}
+                    name="fullName"
+                    value={formData.fullName}
                     onChange={handleChange}
                     placeholder="John Doe"
                     className="w-full rounded-lg border border-gray-200 bg-white pl-10 pr-4 py-3 text-sm text-gray-900 placeholder:text-gray-400 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
