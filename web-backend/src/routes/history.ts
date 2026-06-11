@@ -26,9 +26,9 @@ router.get('/', protect, async (req: Request, res: Response): Promise<any> => {
       }
 
       // Map backend core detection pipelines into frontend filter buckets
-      let type: 'deepfake' | 'aigen' | 'phishing' = 'deepfake';
+      let type: 'deepfake' | 'text' = 'deepfake';
       if (item.detectionMode === 'text') {
-        type = 'phishing'; // Groups text analyses under Phishing or AI Content depending on intent
+        type = 'text'; 
       }
 
       // Generate a detailed analytical sentence using the breakdown values for the frontend card

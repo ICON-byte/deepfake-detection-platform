@@ -14,9 +14,19 @@ import {
   Search,
   UploadCloud,
   ChevronRight,
-  Volume2
+  Volume2,
+  Info
 } from "lucide-react";
 import React, { useState } from "react";
+import { toast } from "sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 type DetectionType = "deepfake" | "text";
 type ResultStatus = "real" | "manipulated";
@@ -31,6 +41,9 @@ interface HistoryItem {
   details: string;
   thumbnail?: string; 
 }
+
+// Define API Base URL - Using relative path to leverage Vite proxy
+const API_BASE_URL = "/api";
 
 // 1. Define the Route with a loader to fetch data from MongoDB via your API gateway
 export const Route = createFileRoute("/history")({
@@ -50,14 +63,20 @@ export const Route = createFileRoute("/history")({
   }),
   loader: async (): Promise<HistoryItem[]> => {
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
-      const response = await fetch(`${apiUrl}/history`);
+      const token = localStorage.getItem("truthlens_token");
+      const response = await fetch(`${API_BASE_URL}/history`, {
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+
       if (!response.ok) {
-        throw new Error("Failed to fetch history from database");
+        throw new Error(`Failed to fetch history: ${response.status}`);
       }
       return await response.json();
     } catch (error) {
-      console.error("Database connection error:", error);
+      toast.error("Database connection error: Failed to fetch history.");
       return []; 
     }
   },
@@ -71,22 +90,34 @@ function HistoryPage() {
   const [historyItems, setHistoryItems] = useState<HistoryItem[]>(initialData);
   const [filterType, setFilterType] = useState<DetectionType | "all">("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedItem, setSelectedItem] = useState<HistoryItem | null>(null);
+
+  // Sync state if loader data changes
+  React.useEffect(() => {
+    setHistoryItems(initialData);
+  }, [initialData]);
 
   const handleDelete = async (id: string) => {
     if (window.confirm("Are you sure you want to delete this analysis from history?")) {
       try {
-        const response = await fetch(`/api/history/${id}`, {
+        const token = localStorage.getItem("truthlens_token");
+        const response = await fetch(`${API_BASE_URL}/history/${id}`, {
           method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
         });
 
         if (response.ok) {
           setHistoryItems((prev) => prev.filter((item) => item.id !== id));
+          toast.success("Analysis record deleted successfully.");
           router.invalidate(); 
         } else {
-          alert("Failed to delete the record from database.");
+          toast.error("Failed to delete the record from database.");
         }
       } catch (err) {
-        console.error("Error communicating with server:", err);
+        toast.error("Error communicating with server.");
       }
     }
   };
@@ -94,18 +125,24 @@ function HistoryPage() {
   const handleClearAll = async () => {
     if (window.confirm("Permanently delete all analysis history from the database? This action cannot be undone.")) {
       try {
-        const response = await fetch("/api/history/clear", {
+        const token = localStorage.getItem("truthlens_token");
+        const response = await fetch(`${API_BASE_URL}/history/clear`, {
           method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
         });
 
         if (response.ok) {
           setHistoryItems([]);
+          toast.success("All historical records have been cleared.");
           router.invalidate();
         } else {
-          alert("Failed to clear database logs.");
+          toast.error("Failed to clear database logs.");
         }
       } catch (err) {
-        console.error("Error communicating with server:", err);
+        toast.error("Error communicating with server.");
       }
     }
   };
@@ -261,14 +298,51 @@ function HistoryPage() {
                   </div>
 
                   <div className="mt-4 flex items-center justify-end gap-2 border-t border-border/50 pt-3">
-                    <button
-                      onClick={() => {
-                        alert(`Full report for: ${item.mediaName}\n\nType: ${item.type}\nStatus: ${item.status}\nConfidence: ${item.confidence}%\nDetails: ${item.details}`);
-                      }}
-                      className="inline-flex items-center gap-1 rounded-full bg-secondary px-3 py-1.5 text-xs font-medium transition hover:bg-secondary/80"
-                    >
-                      <Eye className="h-3.5 w-3.5" /> View
-                    </button>
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <button
+                          onClick={() => setSelectedItem(item)}
+                          className="inline-flex items-center gap-1 rounded-full bg-secondary px-3 py-1.5 text-xs font-medium transition hover:bg-secondary/80"
+                        >
+                          <Eye className="h-3.5 w-3.5" /> View
+                        </button>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-md">
+                        <DialogHeader>
+                          <DialogTitle className="flex items-center gap-2">
+                            <Info className="h-5 w-5 text-primary" />
+                            Analysis Report
+                          </DialogTitle>
+                          <DialogDescription>
+                            Detailed breakdown of the forensic scan for {item.mediaName}
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="mt-4 space-y-4">
+                          <div className="grid grid-cols-2 gap-4 rounded-xl border border-border/50 bg-muted/30 p-4">
+                            <div>
+                              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Type</p>
+                              <p className="mt-1 text-sm font-semibold capitalize">{item.type}</p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Status</p>
+                              <div className="mt-1">{getStatusBadge(item.status)}</div>
+                            </div>
+                            <div>
+                              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Confidence</p>
+                              <p className="mt-1 text-sm font-semibold">{item.confidence}%</p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Date</p>
+                              <p className="mt-1 text-sm font-semibold">{formatDate(item.date)}</p>
+                            </div>
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Analysis Details</p>
+                            <p className="mt-2 text-sm leading-relaxed text-foreground/80">{item.details}</p>
+                          </div>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
                     <Link
                       to="/detect"
                       className="inline-flex items-center gap-1 rounded-full border border-border/70 bg-background px-3 py-1.5 text-xs font-medium transition hover:bg-secondary"

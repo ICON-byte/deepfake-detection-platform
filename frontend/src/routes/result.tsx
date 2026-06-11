@@ -60,6 +60,20 @@ interface AIData {
 }
 
 export const Route = createFileRoute("/result")({
+  head: () => ({
+    meta: [
+      { title: "Analysis Result · TruthLens" },
+      {
+        name: "description",
+        content: "Detailed breakdown of your deepfake or AI analysis result.",
+      },
+      { property: "og:title", content: "TruthLens Analysis Result" },
+      {
+        property: "og:description",
+        content: "Review granular metrics and confidence scores for your scan.",
+      },
+    ],
+  }),
   component: ResultPage,
   validateSearch: (search: Record<string, unknown>) => {
     return {

@@ -2,6 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { SiteLayout } from "@/components/SiteLayout";
 import { useState } from "react";
 import { Mail, Lock, Eye, EyeOff } from "lucide-react";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/login")({
   head: () => ({
@@ -53,6 +54,8 @@ function LoginPage() {
       // Store auth data
       localStorage.setItem("truthlens_token", data.token);
       localStorage.setItem("truthlens_user", JSON.stringify(data.user));
+
+      toast.success("Welcome back! Logged in successfully.");
 
       // Redirect to detect page (or dashboard)
       navigate({ to: "/detect" });

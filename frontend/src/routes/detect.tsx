@@ -17,9 +17,10 @@ import {
 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import axios from "axios";
+import { toast } from "sonner";
 
-// Target backend API base configuration
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+// Target backend API base configuration - Using relative path to leverage Vite proxy
+const API_BASE_URL = "/api";
 
 export const Route = createFileRoute("/detect")({
   head: () => ({
@@ -274,7 +275,7 @@ function DeepfakePanel({ onCheckLimit, onTrackScan, headers, onTriggerLimitModal
           setPreviewUrl(null); // No preview for video/audio in this simple view
         }
       } else {
-        alert("Please select a valid image, video, or audio file.");
+        toast.error("Please select a valid image, video, or audio file.");
       }
     }
   };
@@ -375,7 +376,7 @@ function DeepfakePanel({ onCheckLimit, onTrackScan, headers, onTriggerLimitModal
       if (err?.response?.status === 429) {
         onTriggerLimitModal();
       } else {
-        alert(err?.response?.data?.message || "An error hit the media storage pipeline.");
+        toast.error(err?.response?.data?.message || "An error hit the media storage pipeline.");
       }
     }
   };
@@ -484,7 +485,7 @@ function AiPanel({ onCheckLimit, onTrackScan, headers, onTriggerLimitModal }: Pa
 
   const executePipeline = async () => {
     if (!textContent.trim() || textContent.length < 50) {
-      alert("Please enter at least 50 characters for a meaningful linguistic audit.");
+      toast.warning("Please enter at least 50 characters for a meaningful linguistic audit.");
       return;
     }
     if (onCheckLimit()) return;
@@ -556,7 +557,7 @@ function AiPanel({ onCheckLimit, onTrackScan, headers, onTriggerLimitModal }: Pa
       if (err?.response?.status === 429) {
         onTriggerLimitModal();
       } else {
-        alert(err?.response?.data?.message || "Linguistic engine pipeline fault.");
+        toast.error(err?.response?.data?.message || "Linguistic engine pipeline fault.");
       }
     }
   };

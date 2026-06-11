@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Navbar } from "./Navbar";
 import { Footer } from "./Footer";
+import { Toaster } from "@/components/ui/sonner";
 
 export function SiteLayout({ children }: { children: ReactNode }) {
   return (
@@ -9,6 +10,7 @@ export function SiteLayout({ children }: { children: ReactNode }) {
       {/* No spacer – content begins at top of viewport, scrolls under the fixed navbar */}
       <main>{children}</main>
       <Footer />
+      <Toaster />
     </div>
   );
 }

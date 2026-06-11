@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { SiteLayout } from "@/components/SiteLayout";
 import { useState } from "react";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/register")({
   head: () => ({
@@ -78,6 +79,8 @@ function RegisterPage() {
       // Store auth session details safely
       localStorage.setItem("truthlens_token", data.token);
       localStorage.setItem("truthlens_user", JSON.stringify(data.user));
+
+      toast.success("Account created successfully! Welcome to TruthLens.");
 
       // Redirect to detection gateway
       navigate({ to: "/detect" });
