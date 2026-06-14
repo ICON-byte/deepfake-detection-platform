@@ -1,160 +1,186 @@
-import { createFileRoute, Link, useNavigate, useSearch } from "@tanstack/react-router";
-import { useState, type ChangeEvent, useEffect } from "react";
-import { PageShell } from "@/components/PageShell";
-import { Mail, Lock, ShieldCheck, type LucideIcon } from "lucide-react";
-import { useAuth } from "@/contexts/AuthContext";
-
-type LoginSearch = {
-  redirect?: string;
-  message?: string;
-};
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { SiteLayout } from "@/components/SiteLayout";
+import { useState } from "react";
+import { Mail, Lock, Eye, EyeOff } from "lucide-react";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/login")({
-  validateSearch: (search: Record<string, unknown>): LoginSearch => ({
-    redirect: search.redirect as string | undefined,
-    message: search.message as string | undefined,
+  head: () => ({
+    meta: [
+      { title: "Login · TruthLens" },
+      { name: "description", content: "Sign in to your TruthLens account." },
+      { property: "og:title", content: "Login · TruthLens" },
+      { property: "og:description", content: "Sign in to TruthLens." },
+    ],
   }),
   component: LoginPage,
 });
 
-type FieldProps = {
-  icon: LucideIcon;
-  type?: string;
-  placeholder?: string;
-  value: string;
-  onChange: (e: ChangeEvent<HTMLInputElement>) => void;
-  required?: boolean;
-};
-
-function Field({ icon: Icon, ...props }: FieldProps) {
-  return (
-    <div className="relative">
-      <Icon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-      <input {...props} className="login-input" />
-    </div>
-  );
-}
-
 function LoginPage() {
-  const { login } = useAuth();
   const navigate = useNavigate();
-  const { redirect, message } = useSearch({ from: "/login" });
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
-  const [successMessage, setSuccessMessage] = useState(message || "");
 
-  // Clear success message after 5 seconds
-  useEffect(() => {
-    if (successMessage) {
-      const timer = setTimeout(() => setSuccessMessage(""), 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [successMessage]);
-
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError("");
-    setSuccessMessage(""); // clear any success message when user submits
+
+    // Basic client-side validation
+    if (!email.trim() || !password.trim()) {
+      setError("Please fill in all fields");
+      return;
+    }
+
     setIsLoading(true);
+    setError("");
+
     try {
-      await login(email, password);
-      navigate({ to: redirect || "/dashboard" });
-    } catch (err) {
-      setError("Invalid email or password. Please try again.");
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || "Invalid email or password");
+      }
+
+      // Store auth data
+      localStorage.setItem("truthlens_token", data.token);
+      localStorage.setItem("truthlens_user", JSON.stringify(data.user));
+
+      toast.success("Welcome back! Logged in successfully.");
+
+      // Redirect to detect page (or dashboard)
+      navigate({ to: "/detect" });
+    } catch (err: any) {
+      setError(err.message || "Login failed. Please try again.");
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <PageShell hideFooter>
-      <style>{`
-        .login-input {
-          background: rgba(0, 0, 0, 0.6);
-          border: 1px solid rgba(102, 153, 255, 0.2);
-          border-radius: 0.75rem;
-          padding: 0.75rem 0.75rem 0.75rem 2.5rem;
-          width: 100%;
-          color: white;
-          font-size: 0.875rem;
-          transition: all 0.2s;
-        }
-        .login-input:focus {
-          outline: none;
-          border-color: #6699FF;
-        }
-        .login-input::placeholder {
-          color: #6b7280;
-        }
-      `}</style>
-      <section className="max-w-md mx-auto px-4 pt-16 pb-20">
-        <div className="glass-card p-8">
-          <div className="w-12 h-12 rounded-xl gradient-primary flex items-center justify-center mx-auto mb-5">
-            <ShieldCheck className="w-6 h-6 text-white" />
+    <SiteLayout>
+      <section className="mx-auto grid min-h-[calc(100vh-4rem)] max-w-6xl gap-0 px-0 pt-16 md:grid-cols-2">
+        {/* Left Panel */}
+        <div className="flex flex-col justify-start bg-[#f4f6ff] px-6 pt-24 pb-12 sm:px-12 relative">
+          <div className="absolute top-8 left-6 sm:left-12">
+            <img src="/images/logo.svg" alt="TruthLens" className="h-10 w-auto" />
           </div>
-          <h1
-            className="text-2xl font-bold text-center text-white"
-            style={{ fontFamily: "'Montserrat', sans-serif" }}
-          >
-            Welcome back
+          <h1 className="text-3xl font-bold sm:text-4xl mt-12">
+            Welcome back to
+            <br />
+            <span className="text-primary">TruthLens.</span>
           </h1>
-          <p className="text-sm text-gray-400 text-center mt-1">Sign in to your TruthLens account.</p>
+          <p className="mt-4 max-w-md text-sm text-muted-foreground">
+            Sign in to continue verifying media authenticity.
+          </p>
+        </div>
 
-          <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
-            {successMessage && (
-              <div className="text-sm text-green-400 bg-green-500/10 border border-green-500/30 rounded-lg p-2 text-center">
-                {successMessage}
-              </div>
-            )}
+        {/* Right Panel - Interactive Form */}
+        <div className="flex flex-col justify-center px-6 py-12 sm:px-12">
+          <div className="mx-auto w-full max-w-sm">
+            <h2 className="text-2xl font-bold">Sign in</h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Use your TruthLens credentials.
+            </p>
+
             {error && (
-              <div className="text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded-lg p-2 text-center">
+              <div className="mt-4 rounded-md bg-red-100 p-3 text-xs text-red-700 dark:bg-red-900/30 dark:text-red-400">
                 {error}
               </div>
             )}
-            <Field
-              icon={Mail}
-              type="email"
-              placeholder="Email address"
-              value={email}
-              onChange={(e: ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)}
-              required
-            />
-            <Field
-              icon={Lock}
-              type="password"
-              placeholder="Password"
-              value={password}
-              onChange={(e: ChangeEvent<HTMLInputElement>) => setPassword(e.target.value)}
-              required
-            />
-            <div className="flex justify-between text-xs text-gray-400">
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  className="accent-[#6699FF]"
-                  aria-label="Remember me"
-                />{" "}
-                Remember me
-              </label>
-              <a href="#" className="hover:text-[#6699FF] transition-colors">
-                Forgot password?
-              </a>
-            </div>
-            <button type="submit" disabled={isLoading} className="btn-primary w-full">
-              {isLoading ? "Signing in..." : "Sign In"}
-            </button>
-          </form>
 
-          <div className="text-center text-sm text-gray-400 mt-6">
-            Don't have an account?{" "}
-            <Link to="/register" className="gradient-text font-semibold">
-              Register
-            </Link>
+            <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+              {/* Email Field */}
+              <div>
+                <label className="text-xs font-medium text-foreground/80">
+                  Email
+                </label>
+                <div className="relative mt-1">
+                  <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      if (error) setError("");
+                    }}
+                    placeholder="Enter your email"
+                    className="w-full rounded-md border border-input bg-background py-2 pl-10 pr-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Password Field */}
+              <div>
+                <label className="text-xs font-medium text-foreground/80">
+                  Password
+                </label>
+                <div className="relative mt-1">
+                  <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      if (error) setError("");
+                    }}
+                    placeholder="Enter your password"
+                    className="w-full rounded-md border border-input bg-background py-2 pl-10 pr-10 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Extras */}
+              <div className="flex items-center justify-between text-xs">
+                <label className="inline-flex items-center gap-2 text-muted-foreground">
+                  <input type="checkbox" className="rounded border-input" /> Remember me
+                </label>
+                <button
+                  type="button"
+                  onClick={(e) => e.preventDefault()}
+                  className="text-primary hover:underline cursor-pointer"
+                >
+                  Forgot Password?
+                </button>
+              </div>
+
+              {/* Submit Button */}
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full rounded-md bg-primary py-2.5 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:opacity-70 disabled:cursor-not-allowed"
+              >
+                {isLoading ? "Signing in..." : "Sign in"}
+              </button>
+            </form>
+
+            <p className="mt-6 text-center text-xs text-muted-foreground">
+              Don't have an account?{" "}
+              <Link to="/register" className="text-primary hover:underline">
+                Register
+              </Link>
+            </p>
           </div>
         </div>
       </section>
-    </PageShell>
+    </SiteLayout>
   );
 }

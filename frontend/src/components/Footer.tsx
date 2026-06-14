@@ -1,51 +1,86 @@
 import { Link } from "@tanstack/react-router";
-import { Globe, Mail, Send } from "lucide-react";
-import { Logo } from "./Logo";
+import { Globe, Mail, MessageCircle } from "lucide-react";
 
 export function Footer() {
   return (
-    <footer className="mt-32 border-t border-white/10 glass-strong">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12 grid gap-10 md:grid-cols-4">
-        <div className="md:col-span-2">
-          <Logo />
-          <p className="mt-4 text-sm text-muted-foreground max-w-sm">
-            AI-powered deepfake detection platform protecting media authenticity across images,
-            video and audio.
-          </p>
-          <div className="mt-6 flex gap-3">
-            {[Globe, Send, Mail].map((Icon, i) => (
-              <a
-                key={i}
-                href="#"
-                className="w-9 h-9 rounded-lg glass flex items-center justify-center hover:bg-white/10 transition"
-              >
-                <Icon className="w-4 h-4" />
+    <footer className="border-t border-border/60 bg-background">
+      <div className="mx-auto max-w-[90rem] px-3 pb-6 pt-10 sm:px-4 lg:px-6">
+        {/* Boxed container for footer content */}
+        <div className="rounded-2xl border border-border/80 bg-card/50 p-5 shadow-sm backdrop-blur-sm sm:p-6">
+          <div className="grid gap-8 md:grid-cols-3 md:gap-10">
+            {/* Brand column */}
+            <div>
+              <div className="text-2xl font-semibold tracking-tight">
+                <img src="/images/logo.svg" alt="Logo" />
+              </div>
+              <p className="mt-3 max-w-sm text-sm text-muted-foreground">
+                AI-Powered deepfake detection platform protecting media authenticity across images, videos and audio.
+              </p>
+              <div className="mt-4 flex items-center gap-3 text-muted-foreground">
+                <a href="#" aria-label="Website" className="transition-colors hover:text-primary">
+                  <Globe className="h-4 w-4" />
+                </a>
+                <a href="#" aria-label="Email" className="transition-colors hover:text-primary">
+                  <Mail className="h-4 w-4" />
+                </a>
+                <a href="#" aria-label="WhatsApp" className="transition-colors hover:text-primary">
+                  <MessageCircle className="h-4 w-4" />
+                </a>
+              </div>
+            </div>
+
+            {/* Links columns */}
+            <div className="grid gap-8 sm:grid-cols-2 md:col-span-2 md:justify-end">
+              <div>
+                <h4 className="text-sm font-semibold text-foreground">Platform</h4>
+                <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
+                  <li>
+                    <Link to="/detect" className="transition-colors hover:text-primary">
+                      Detect
+                    </Link>
+                  </li>
+                  <li>
+                    <Link to="/about" className="transition-colors hover:text-primary">
+                      About
+                    </Link>
+                  </li>
+                </ul>
+              </div>
+              <div>
+                <h4 className="text-sm font-semibold text-foreground">Account</h4>
+                <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
+                  <li>
+                    <Link to="/login" className="transition-colors hover:text-primary">
+                      Login
+                    </Link>
+                  </li>
+                  <li>
+                    <Link to="/register" className="transition-colors hover:text-primary">
+                      Register
+                    </Link>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          {/* Copyright row */}
+          <div className="mt-8 flex flex-col items-start justify-between gap-2 border-t border-border/60 pt-6 text-xs text-muted-foreground sm:flex-row sm:items-center sm:gap-4">
+            <p>© 2026 TruthLens AI · Nigerian Computer Society (NCS)</p>
+            <p>
+              Developed by{" "}
+              <a href="#" className="text-primary transition-colors hover:underline">
+                Neo Cloud Technologies
               </a>
-            ))}
+            </p>
           </div>
         </div>
-        <div>
-          <h4 className="font-semibold mb-3 text-sm">Platform</h4>
-          <ul className="space-y-2 text-sm text-muted-foreground">
-            <li><Link to="/detect" className="hover:text-foreground">Detect</Link></li>
-            <li><Link to="/dashboard" className="hover:text-foreground">Dashboard</Link></li>
-            <li><Link to="/history" className="hover:text-foreground">History</Link></li>
-            <li><Link to="/about" className="hover:text-foreground">About</Link></li>
-          </ul>
-        </div>
-        <div>
-          <h4 className="font-semibold mb-3 text-sm">Account</h4>
-          <ul className="space-y-2 text-sm text-muted-foreground">
-            <li><Link to="/login" className="hover:text-foreground">Login</Link></li>
-            <li><Link to="/register" className="hover:text-foreground">Register</Link></li>
-            <li><Link to="/profile" className="hover:text-foreground">Profile</Link></li>
-          </ul>
-        </div>
-      </div>
-      <div className="border-t border-white/10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-5 flex flex-col md:flex-row items-center justify-between gap-2 text-xs text-muted-foreground">
-          <p>© {new Date().getFullYear()} TruthLens AI · Nigeria Computer Society (NCS)</p>
-          <p>Developed by <span className="gradient-text font-semibold">Neo Cloud Technologies</span></p>
+
+        {/* Large background watermark (still visible outside the box) */}
+        <div className="pointer-events-none mt-6 select-none overflow-hidden text-center">
+          <p className="bg-gradient-to-b from-primary/15 to-transparent bg-clip-text text-[13vw] font-extrabold leading-none tracking-tighter text-transparent sm:text-[12vw] lg:text-[11vw]">
+            TRUTHLENS
+          </p>
         </div>
       </div>
     </footer>

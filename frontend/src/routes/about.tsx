@@ -1,72 +1,242 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { motion } from "framer-motion";
-import { Shield, Target, Users, Cpu } from "lucide-react";
-import { PageShell } from "@/components/PageShell";
+import { SiteLayout } from "@/components/SiteLayout";
+import { useState } from "react";
+import { ChevronRight, House } from "lucide-react";
 
-export const Route = createFileRoute("/about")({ component: AboutPage });
+export const Route = createFileRoute("/about")({
+  head: () => ({
+    meta: [
+      { title: "About · TruthLens" },
+      { name: "description", content: "Advancing trust through intelligent verification — the team and mission behind TruthLens." },
+      { property: "og:title", content: "About · TruthLens" },
+      { property: "og:description", content: "Advancing trust through intelligent verification." },
+    ],
+  }),
+  component: AboutPage,
+});
 
-const aboutCards = [
-  { icon: Target, title: "Our Mission", desc: "Restore trust in digital media by making deepfake detection accessible, fast, and accurate." },
-  { icon: Cpu, title: "Our Technology", desc: "Ensemble of CNN, transformer, and audio-spectral models — continually trained on emerging threats." },
-  { icon: Shield, title: "Built for Security", desc: "End-to-end encryption, isolated GPU sandboxes, and configurable zero-retention policies." },
-  { icon: Users, title: "Our Partners", desc: "Newsrooms, electoral commissions, and financial institutions across Africa and beyond." },
+const team = [
+  { n: "01", name: "David Bara", role: "Cybersecurity Analyst" },
+  { n: "02", name: "Isreal O", role: "Web Developer" },
+  { n: "03", name: "Ayomide O", role: "AI/ML Engineer" },
+  { n: "04", name: "Khandle E", role: "Design Lead" },
+  { n: "05", name: "Demilade A", role: "Cloud Engineer" },
 ];
 
 function AboutPage() {
+  const [tab, setTab] = useState<"mission" | "vision">("mission");
+
   return (
-    <PageShell>
-      <section className="max-w-5xl mx-auto px-4 sm:px-6 pt-20 pb-12">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-black/50 backdrop-blur-sm border border-[#6699FF]/30 text-xs font-medium text-gray-300 mb-4">
-          <span className="w-1.5 h-1.5 rounded-full bg-[#F7941D]" />
-          <span>About TruthLens AI × Neo Cloud Technologies</span>
-        </div>
-        <h1 
-          className="text-4xl md:text-5xl font-bold tracking-tight text-white"
-          style={{ fontFamily: "'Montserrat', sans-serif" }}
-        >
-          Protecting media truth in the <span className="gradient-text">age of AI</span>
-        </h1>
-        <p className="mt-5 text-lg text-gray-300 max-w-2xl">
-          TruthLens AI is a cybersecurity research initiative built for the Nigeria Computer Society
-          (NCS) by Neo Cloud Technologies. We give journalists, regulators, and citizens the tools
-          to verify whether media has been synthetically generated or manipulated.
-        </p>
-      </section>
+    <SiteLayout>
+      {/* Hero Section (unchanged – kept exactly as you wrote) */}
+      <section className="bg-[#eef2ff]/40">
+        <div className="mx-auto max-w-360 px-3 pb-12 pt-28 sm:px-4 sm:pt-40 lg:px-6">
+          <nav className="flex text-sm text-muted-foreground">
+            <Link to="/" className="inline-flex items-center gap-1.5 hover:text-primary">
+              <House className="h-4 w-4" />
+              Home
+            </Link>{" "}
+            / <span className="text-foreground">About</span>
+          </nav>
 
-      <section className="max-w-5xl mx-auto px-4 sm:px-6 grid gap-5 md:grid-cols-2">
-        {aboutCards.map((card, i) => (
-          <motion.div
-            key={card.title}
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ delay: i * 0.05 }}
-            className="glass-card"
-          >
-            <div className="w-10 h-10 rounded-lg gradient-primary flex items-center justify-center mb-4">
-              <card.icon className="w-5 h-5 text-white" />
+          <div className="mt-8 grid items-start gap-6 md:grid-cols-2">
+            <h1 className="text-3xl font-bold tracking-tight sm:text-5xl">
+              Advancing Trust Through
+              <br />
+              Intelligent Verification
+            </h1>
+            <p className="text-base text-muted-foreground sm:text-lg">
+              Detect manipulated content, reduce misinformation, and verify
+              authenticity before you trust or share.
+            </p>
+          </div>
+
+          <div className="mt-10 grid items-start gap-6 md:grid-cols-2">
+            <div className="aspect-16/10 w-full overflow-hidden rounded-2xl bg-linear-to-br from-slate-200 to-slate-300">
+              <img
+                src="/images/about-1.png"
+                alt="Media verification illustration left"
+                className="h-full w-full object-cover"
+              />
             </div>
-            <h3 className="font-semibold text-lg text-white mb-1">{card.title}</h3>
-            <p className="text-sm text-gray-400">{card.desc}</p>
-          </motion.div>
-        ))}
-      </section>
-
-      <section className="max-w-4xl mx-auto px-4 sm:px-6 py-16">
-        <div className="glass-strong rounded-2xl p-10 text-center border border-[#6699FF]/20">
-          <h2 
-            className="text-2xl md:text-3xl font-bold text-white"
-            style={{ fontFamily: "'Montserrat', sans-serif" }}
-          >
-            Try TruthLens AI today
-          </h2>
-          <p className="mt-2 text-gray-400">No setup. Upload and verify in seconds.</p>
-          <div className="mt-6 flex justify-center gap-3 flex-wrap">
-            <Link to="/detect" className="btn-primary">Analyze Media</Link>
-            <Link to="/register" className="btn-outline">Get Started</Link>
+            <div className="flex flex-col gap-4">
+              <Link
+                to="/detect"
+                className="flex w-full items-center justify-center gap-2 rounded-2xl bg-primary px-8 py-4 text-base font-semibold text-primary-foreground shadow-lg shadow-primary/25 transition hover:bg-primary/90 sm:w-56 sm:px-10 sm:py-5"
+              >
+                Analyse Media
+                <ChevronRight />
+              </Link>
+              <div className="aspect-16/10 w-full overflow-hidden rounded-2xl bg-linear-to-br from-indigo-900 to-blue-700 md:w-[78%]">
+                <img
+                  src="/images/about-2.png"
+                  alt="Media verification illustration right"
+                  className="h-full w-full object-cover"
+                />
+              </div>
+            </div>
           </div>
         </div>
       </section>
-    </PageShell>
+
+      {/* Our Story */}
+      <section className="bg-[#f7f8ff]">
+        <div className="mx-auto grid max-w-360 items-start gap-10 px-3 py-12 sm:px-8 sm:py-14 lg:grid-cols-[1.35fr_0.9fr] lg:px-12">
+          <div>
+            <div className="flex items-start gap-3 sm:gap-4">
+              <div className="mt-1 h-17 w-4 shrink-0 bg-primary sm:h-18.5 sm:w-5.5" />
+              <div>
+                <p className="text-base text-muted-foreground">Our Story</p>
+                <h2 className="mt-1 text-2xl font-semibold leading-tight tracking-tight text-foreground sm:text-[34px]">
+                  Your Vision, Our Expertise, Your Success.
+                  <br />
+                  <span className="text-primary">Leads Dominate.</span>
+                </h2>
+              </div>
+            </div>
+            <p className="mt-6 max-w-190 text-base leading-7 text-muted-foreground sm:text-lg sm:leading-8">
+              TruthLens AI is a cybersecurity research initiative built for the{" "}
+              <a href="#" className="text-primary hover:underline">
+                Nigeria Computer Society
+              </a>{" "}
+              (NCS) by Neo Cloud Technologies. We give journalists, regulators,
+              and citizens the tools to verify whether media has been
+              synthetically generated or manipulated.
+            </p>
+          </div>
+          <div className="flex justify-center pt-0 lg:justify-end lg:pt-1">
+            <div className="relative h-37.5 w-full max-w-108.5 rounded-[10px] bg-primary sm:h-43.25">
+              <div className="absolute bottom-0 left-5 right-0 top-6.25 overflow-hidden rounded-xl bg-linear-to-br from-slate-900 to-slate-700">
+                <img
+                  src="/images/about-3.png"
+                  alt="Our story illustration"
+                  className="h-full w-full object-cover"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Commitment (Mission / Vision) */}
+      <section className="bg-[#f7f8ff]">
+        <div className="mx-auto max-w-360 px-3 pb-12 pt-14 sm:px-8 sm:pb-14 sm:pt-16 lg:px-12">
+          <div className="text-center">
+            <h2 className="mx-auto max-w-225 text-2xl font-medium leading-tight tracking-normal text-foreground sm:text-4xl">
+              Commitment to Transparency, Trust, and{" "}
+              <span className="text-primary">Digital Authenticity</span> in an
+              Increasingly <span className="text-primary">AI-Generated World</span>
+            </h2>
+            <p className="mx-auto mt-5 max-w-170 text-base leading-snug text-muted-foreground sm:text-lg">
+              Helping individuals and organizations verify digital content with
+              confidence and build trust in the digital world.
+            </p>
+          </div>
+
+          <div className="mx-auto mt-9 flex max-w-90 rounded-full bg-[#f0f0f0] p-2 shadow-sm sm:p-3">
+            <button
+              onClick={() => setTab("mission")}
+              className={`flex-1 rounded-full px-4 py-2 text-base font-medium transition sm:px-5 sm:py-2.5 sm:text-lg ${
+                tab === "mission"
+                  ? "bg-primary text-primary-foreground"
+                  : "text-foreground/70"
+              }`}
+            >
+              Our Mission
+            </button>
+            <button
+              onClick={() => setTab("vision")}
+              className={`flex-1 rounded-full px-4 py-2 text-base font-medium transition sm:px-5 sm:py-2.5 sm:text-lg ${
+                tab === "vision"
+                  ? "bg-primary text-primary-foreground"
+                  : "text-foreground/70"
+              }`}
+            >
+              Our Vision
+            </button>
+          </div>
+
+          <div className="mt-10 grid items-center gap-8 md:grid-cols-2">
+            <div>
+              <h3 className="text-2xl font-bold">
+                What we <span className="italic text-primary">Stand</span> For
+              </h3>
+              <p className="mt-3 text-base leading-7 text-muted-foreground">
+                {tab === "mission"
+                  ? "To empower individuals and organisations with accessible, reliable, and transparent tools for verifying digital content; helping them identify manipulated media and make informed decisions with confidence."
+                  : "A future where every piece of digital media can be trusted — where AI augments human judgement rather than undermining it, and where verification is universal."}
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-3 sm:gap-4">
+              <div className="aspect-square w-full overflow-hidden rounded-xl">
+                <img
+                  src="/images/about-4.webp"
+                  alt="Commitment illustration left"
+                  className="h-full w-full object-cover"
+                />
+              </div>
+              <div className="aspect-square w-full overflow-hidden rounded-2xl">
+                <img
+                  src="/images/about-5.webp"
+                  alt="Commitment illustration right"
+                  className="h-full w-full object-cover"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Our Team */}
+      <section className="mx-auto max-w-360 px-3 py-16 sm:px-4 lg:px-6">
+        <div className="text-center">
+          <p className="text-sm font-semibold uppercase tracking-wider text-primary">
+            Our Team
+          </p>
+          <p className="mt-3 text-base text-muted-foreground sm:text-lg">
+            A growing team of AI researchers, cybersecurity experts, and
+            technology
+            <br className="hidden sm:block" />
+            professionals working to build trust in the age of digital media.
+          </p>
+        </div>
+
+        <ul className="mt-10 divide-y divide-border/70 rounded-2xl border border-border/70 bg-card">
+          {team.map((p) => (
+            <li
+              key={p.n}
+              className="group flex flex-col items-start justify-between gap-2 px-4 py-4 transition hover:bg-primary/5 sm:flex-row sm:items-center sm:gap-4 sm:px-5"
+            >
+              <div className="flex items-center gap-4">
+                <span className="text-sm text-muted-foreground">( {p.n} )</span>
+                <span className="text-lg font-semibold">{p.name}</span>
+              </div>
+              <span className="text-sm text-muted-foreground">( {p.role} )</span>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      {/* CTA */}
+      <section className="mx-auto max-w-5xl px-4 pb-24 sm:px-6 lg:px-8">
+        <div className="rounded-3xl bg-linear-to-br from-primary to-[#7a92ff] p-7 text-center text-primary-foreground shadow-xl shadow-primary/25 sm:p-10">
+          <h3 className="text-2xl font-bold sm:text-4xl">
+            Ready to verify the truth?
+          </h3>
+          <p className="mx-auto mt-3 max-w-2xl text-base text-primary-foreground/80 sm:text-lg">
+            Upload your first file and get fast, reliable authenticity analysis
+            from TruthLens AI.
+          </p>
+          <div className="mt-6">
+            <Link
+              to="/detect"
+              className="inline-block rounded-full bg-white px-7 py-3.5 text-base font-semibold text-primary shadow-sm transition hover:bg-white/90"
+            >
+              Start Detection
+            </Link>
+          </div>
+        </div>
+      </section>
+    </SiteLayout>
   );
 }

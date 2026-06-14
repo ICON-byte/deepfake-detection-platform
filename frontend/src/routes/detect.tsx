@@ -1,388 +1,625 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
-import { useCallback, useState, useRef, useEffect } from "react";
-import { useDropzone } from "react-dropzone";
-import { motion, AnimatePresence } from "framer-motion";
-import { UploadCloud, Image as ImageIcon, Video, Music, X, Loader2 } from "lucide-react";
-import { PageShell } from "@/components/PageShell";
-import { useAuth } from '@/contexts/AuthContext';
+import { SiteLayout } from "@/components/SiteLayout";
+import {
+  UploadCloud,
+  ShieldCheck,
+  FileText,
+  RotateCcw,
+  Loader2,
+  Image,
+  FileCode2,
+  Link2,
+  File,
+  X,
+  Lock,
+  Video,
+  Mic,
+} from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import axios from "axios";
+import { toast } from "sonner";
+
+// Target backend API base configuration - Using relative path to leverage Vite proxy
+const API_BASE_URL = "/api";
 
 export const Route = createFileRoute("/detect")({
-  component: DetectPage
+  head: () => ({
+    meta: [
+      { title: "Detect · TruthLens" },
+      {
+        name: "description",
+        content: "Run TruthLens deepfake, AI-generated content, and phishing analysis.",
+      },
+      { property: "og:title", content: "TruthLens Detect" },
+      {
+        property: "og:description",
+        content: "Verify media files, text and suspicious URLs in seconds.",
+      },
+    ],
+  }),
+  component: DetectPage,
 });
 
-const ACCEPT = {
-  "image/jpeg": [".jpg", ".jpeg"],
-  "image/png": [".png"],
-  "image/webp": [".webp"],
-  "video/mp4": [".mp4"],
-  "video/quicktime": [".mov"],
-  "audio/mpeg": [".mp3"],
-  "audio/wav": [".wav"],
-};
-
-const STATUSES = [
-  "Uploading media",
-  "Scanning metadata",
-  "Detecting inconsistencies",
-  "Running AI analysis",
-  "Generating report",
-];
-
-function iconFor(type: string) {
-  if (type.startsWith("image")) return ImageIcon;
-  if (type.startsWith("video")) return Video;
-  return Music;
-}
+type Tab = "deepfake" | "ai";
 
 function DetectPage() {
-  const { token, user, scansRemaining } = useAuth();
-  const navigate = useNavigate();
-  const [file, setFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [analyzing, setAnalyzing] = useState(false);
-  const [currentStatusIndex, setCurrentStatusIndex] = useState(0);
-  const [analysisProgress, setAnalysisProgress] = useState(0);
-  const [error, setError] = useState<string | null>(null);
+  const [tab, setTab] = useState<Tab>("deepfake");
+  const [showLimitModal, setShowLimitModal] = useState(false);
+  const [authHeaders, setAuthHeaders] = useState<Record<string, string>>({});
 
-  const uploadIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const statusIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const fetchResultRef = useRef<{ data: any; error: any } | null>(null);
-  const startTimeRef = useRef<number | null>(null);
-  const minDuration = 10000; // 10 seconds minimum analysis display
-
-  const getClientId = () => {
-    let id = localStorage.getItem('detect_client_id');
-    if (!id) {
-      id = crypto.randomUUID();
-      localStorage.setItem('detect_client_id', id);
+  // Initialize auth headers on mount (client-side only)
+  useEffect(() => {
+    const token = localStorage.getItem("truthlens_token");
+    if (token) {
+      setAuthHeaders({ Authorization: `Bearer ${token}` });
     }
-    return id;
-  };
-
-  const onDrop = useCallback((accepted: File[]) => {
-    const f = accepted[0];
-    if (!f) return;
-    setFile(f);
-    setError(null);
-    setUploadProgress(0);
-    if (f.type.startsWith("image") || f.type.startsWith("video")) {
-      setPreview(URL.createObjectURL(f));
-    } else {
-      setPreview(null);
-    }
-
-    if (uploadIntervalRef.current) clearInterval(uploadIntervalRef.current);
-    let p = 0;
-    uploadIntervalRef.current = setInterval(() => {
-      p += Math.random() * 3 + 1;
-      if (p >= 100) {
-        p = 100;
-        if (uploadIntervalRef.current) clearInterval(uploadIntervalRef.current);
-      }
-      setUploadProgress(Math.min(Math.round(p), 100));
-    }, 150);
   }, []);
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop, accept: ACCEPT, multiple: false, maxSize: 100 * 1024 * 1024,
-  });
+  // Helper hook to check authentication and manage session-based free local usage
+  const checkGuestLimitReached = (): boolean => {
+    const token = localStorage.getItem("truthlens_token");
+    if (token) return false; // Authenticated users have unlimited access
+
+    const currentScans = parseInt(sessionStorage.getItem("truthlens_guest_scans") || "0", 10);
+    if (currentScans >= 3) {
+      setShowLimitModal(true);
+      return true;
+    }
+    return false;
+  };
+
+  // Helper to increment scan counts for guests
+  const incrementGuestScanCount = () => {
+    const token = localStorage.getItem("truthlens_token");
+    if (!token) {
+      const currentScans = parseInt(sessionStorage.getItem("truthlens_guest_scans") || "0", 10);
+      sessionStorage.setItem("truthlens_guest_scans", (currentScans + 1).toString());
+    }
+  };
+
+  return (
+    <SiteLayout>
+      <section className="relative overflow-hidden bg-background">
+        <GreyBlockBackground />
+        <div className="relative mx-auto max-w-5xl px-3 pb-12 pt-28 sm:px-6 sm:pt-32 lg:px-8">
+          <div className="text-center">
+            <span className="inline-flex max-w-full items-center gap-2 rounded-full border border-[#6699ff]/30 bg-[#6699ff]/5 px-4 py-1.5 text-sm font-medium text-[#6699ff]">
+              <ShieldCheck className="h-4 w-4" /> Multiple detection workflows for media and text.
+            </span>
+            <h1 className="mt-5 text-3xl font-bold sm:text-5xl">TruthLens Detect</h1>
+            <p className="mx-auto mt-4 max-w-2xl text-base text-muted-foreground sm:text-lg">
+              Select a workflow below, then upload files or paste content for real-time deepfake and AI analysis.
+            </p>
+          </div>
+
+          <div className="mx-auto mt-10 max-w-2xl bg-gray-100/60 border border-gray-200/60 p-1 rounded-3xl sm:rounded-full shadow-inner">
+            <div className="grid grid-cols-1 gap-1 sm:grid-cols-2 items-center">
+              <TabBtn active={tab === "deepfake"} onClick={() => setTab("deepfake")}>
+                Deepfake Detect
+              </TabBtn>
+              <TabBtn active={tab === "ai"} onClick={() => setTab("ai")}>
+                Text AI Detection
+              </TabBtn>
+            </div>
+          </div>
+
+          <div className="mt-8">
+            {tab === "deepfake" && (
+              <DeepfakePanel 
+                onCheckLimit={checkGuestLimitReached} 
+                onTrackScan={incrementGuestScanCount} 
+                headers={authHeaders}
+                onTriggerLimitModal={() => setShowLimitModal(true)}
+              />
+            )}
+            {tab === "ai" && (
+              <AiPanel 
+                onCheckLimit={checkGuestLimitReached} 
+                onTrackScan={incrementGuestScanCount} 
+                headers={authHeaders}
+                onTriggerLimitModal={() => setShowLimitModal(true)}
+              />
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* 🛑 GUEST RATE LIMIT REACHED OVERLAY MODAL */}
+      {showLimitModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="relative w-full max-w-md rounded-2xl border border-gray-100 bg-white p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+            <button 
+              onClick={() => setShowLimitModal(false)}
+              className="absolute right-4 top-4 rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+              aria-label="Close modal"
+            >
+              <X className="h-5 w-5" />
+            </button>
+            
+            <div className="flex flex-col items-center text-center">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-50 text-red-500">
+                <Lock className="h-6 w-6" />
+              </div>
+              <h3 className="mt-4 text-xl font-bold text-gray-900">Scan Limit Reached</h3>
+              <p className="mt-2 text-sm text-gray-500">
+                You've used your 3 free anonymous scans! Protect your data, unlock full breakdown parameters, and maintain an audit history by creating an account.
+              </p>
+              
+              <div className="mt-6 flex w-full flex-col gap-2">
+                <Link
+                  to="/register"
+                  onClick={() => setShowLimitModal(false)}
+                  className="flex w-full items-center justify-center rounded-xl bg-[#6699ff] py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#6699ff]/90 transition-colors"
+                >
+                  Sign Up For Free
+                </Link>
+                <Link
+                  to="/login"
+                  onClick={() => setShowLimitModal(false)}
+                  className="flex w-full items-center justify-center rounded-xl border border-gray-200 bg-white py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  Log In
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </SiteLayout>
+  );
+}
+
+function GreyBlockBackground() {
+  return (
+    <div className="pointer-events-none absolute inset-0 overflow-hidden">
+      <div className="absolute left-[8%] top-0 h-28 w-28 bg-slate-100/70" />
+      <div className="absolute left-[17%] top-28 h-28 w-36 bg-slate-100/60" />
+      <div className="absolute left-[34%] top-0 h-28 w-44 bg-slate-100/45" />
+      <div className="absolute right-[14%] top-0 h-28 w-44 bg-slate-100/70" />
+      <div className="absolute right-[6%] top-28 h-28 w-28 bg-slate-100/55" />
+      <div className="absolute left-0 top-80 h-28 w-28 bg-slate-100/55" />
+      <div className="absolute left-[17%] top-108 h-28 w-36 bg-slate-100/55" />
+      <div className="absolute left-[34%] top-108 h-56 w-28 bg-slate-100/45" />
+      <div className="absolute right-[26%] top-80 h-56 w-28 bg-slate-100/60" />
+      <div className="absolute right-[8%] top-108 h-28 w-28 bg-slate-100/60" />
+      <div className="absolute left-[8%] bottom-0 h-28 w-28 bg-slate-100/65" />
+      <div className="absolute right-[14%] bottom-0 h-28 w-44 bg-slate-100/50" />
+    </div>
+  );
+}
+
+function TabBtn({
+  active,
+  children,
+  onClick,
+}: {
+  active: boolean;
+  children: React.ReactNode;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`w-full py-3 px-6 text-sm font-medium tracking-wide rounded-full transition-all duration-200 select-none ${
+        active
+          ? "bg-[#6699ff] text-white shadow-sm"
+          : "text-gray-500 hover:text-gray-800 bg-transparent"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function PanelCard({
+  title,
+  children,
+  icon,
+}: {
+  title: string;
+  children: React.ReactNode;
+  icon?: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-2xl border border-border/70 bg-card p-4 shadow-sm sm:p-6">
+      <div className="flex flex-wrap items-center gap-2 text-base">
+        {icon && <span className="text-[#6699ff]">{icon}</span>}
+        <span className="font-semibold">{title}</span>
+        <span className="inline-flex items-center gap-1 rounded-full bg-[#6699ff]/10 px-2.5 py-1 text-sm font-medium text-[#6699ff]">
+          <ShieldCheck className="h-3.5 w-3.5" /> Powered by TruthLens
+        </span>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+interface PanelProps {
+  onCheckLimit: () => boolean;
+  onTrackScan: () => void;
+  headers: any;
+  onTriggerLimitModal: () => void;
+}
+
+// ======================= DEEPFAKE PANEL (PRODUCTION AWS PIPELINE) =======================
+function DeepfakePanel({ onCheckLimit, onTrackScan, headers, onTriggerLimitModal }: PanelProps) {
+  const navigate = useNavigate();
+  const [file, setFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [statusMessage, setStatusMessage] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     return () => {
-      if (uploadIntervalRef.current) clearInterval(uploadIntervalRef.current);
-      if (statusIntervalRef.current) clearInterval(statusIntervalRef.current);
-      if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
     };
-  }, []);
+  }, [previewUrl]);
 
-  const finishAnalysis = (reportData: any, fileName: string, fileType: string) => {
-    // Clear all animation intervals
-    if (statusIntervalRef.current) clearInterval(statusIntervalRef.current);
-    if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
-    setAnalysisProgress(100);
-    setCurrentStatusIndex(STATUSES.length - 1);
+  const handleFileSelect = async (selectedFile: File | null) => {
+    if (selectedFile) {
+      const isImage = selectedFile.type.startsWith("image/");
+      const isVideo = selectedFile.type.startsWith("video/");
+      const isAudio = selectedFile.type.startsWith("audio/");
 
-    // Navigate after a short delay to show 100%
-    setTimeout(() => {
-      navigate({
-        to: '/results',
-        search: {
-          verdict: reportData.report.verdict === 'Fake' ? 'fake' : 'real',
-          confidence: Math.round(reportData.report.confidence),
-          name: fileName,
-          type: fileType.split('/')[0] || 'file',
+      if (isImage || isVideo || isAudio) {
+        if (onCheckLimit()) return;
+        setFile(selectedFile);
+        if (previewUrl) URL.revokeObjectURL(previewUrl);
+        
+        if (isImage) {
+          setPreviewUrl(URL.createObjectURL(selectedFile));
+        } else {
+          setPreviewUrl(null); // No preview for video/audio in this simple view
+        }
+      } else {
+        toast.error("Please select a valid image, video, or audio file.");
+      }
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    if (!isProcessing) setIsDragging(true);
+  };
+
+  const handleDragLeave = () => {
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    if (isProcessing) return;
+    const droppedFile = e.dataTransfer.files?.[0] || null;
+    handleFileSelect(droppedFile);
+  };
+
+  const executePipeline = async () => {
+    if (!file) return;
+    if (onCheckLimit()) return;
+
+    setIsProcessing(true);
+    setProgress(5);
+    setStatusMessage("Requesting secure upload verification signature...");
+
+    try {
+      const isImage = file.type.startsWith("image/");
+      const isVideo = file.type.startsWith("video/");
+      const isAudio = file.type.startsWith("audio/");
+      const mode = isAudio ? "audio" : (isVideo ? "video" : "image");
+
+      // Phase 1: Call gateway to acquire AWS Presigned Upload Target
+      const presignResponse = await axios.post(
+        `${API_BASE_URL}/detection/request-upload`,
+        { fileName: file.name, fileType: file.type, mode: mode },
+        { headers }
+      );
+
+      const { presignedUrl, s3Key, fileUrl } = presignResponse.data;
+
+      // Phase 2: Upload direct payload binary straight to the S3 bucket node
+      setStatusMessage(`Uploading ${mode} securely to AWS S3 storage vault...`);
+      setProgress(25);
+
+      await axios.put(presignedUrl, file, {
+        headers: { "Content-Type": file.type },
+        onUploadProgress: (progressEvent) => {
+          if (progressEvent.total) {
+            const percentage = Math.round((progressEvent.loaded * 45) / progressEvent.total);
+            setProgress(25 + percentage);
+          }
         },
       });
-    }, 300);
-  };
 
-  const handleAnalyze = async () => {
-    if (!file) return;
-    setError(null);
-    setUploading(true);
-    setAnalyzing(true);
-    setCurrentStatusIndex(0);
-    setAnalysisProgress(0);
-    startTimeRef.current = Date.now();
-    fetchResultRef.current = null;
+      // Phase 3: Submit asset mapping indexes down into Python architecture
+      setStatusMessage(`Analyzing ${mode} biometrics & artifacts...`);
+      setProgress(75);
 
-    const formData = new FormData();
-    formData.append('file', file);
-    if (!token) {
-      formData.append('client_id', getClientId());
-    }
+      const analysisResponse = await axios.post(
+        `${API_BASE_URL}/detection/analyze`,
+        { fileUrl, s3Key, fileName: file.name, detectionMode: mode },
+        { headers }
+      );
 
-    // Start status rotation: each status 2 seconds => total 10 seconds
-    let step = 0;
-    const totalSteps = STATUSES.length;
-    if (statusIntervalRef.current) clearInterval(statusIntervalRef.current);
-    statusIntervalRef.current = setInterval(() => {
-      step++;
-      if (step < totalSteps) {
-        setCurrentStatusIndex(step);
-      }
-      if (step >= totalSteps - 1) {
-        if (statusIntervalRef.current) clearInterval(statusIntervalRef.current);
-      }
-    }, 2000);
+      setProgress(100);
+      onTrackScan();
+      setIsProcessing(false);
 
-    // Progress bar: increase from 0 to 100 over 10 seconds (linear)
-    let progress = 0;
-    if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
-    progressIntervalRef.current = setInterval(() => {
-      if (progress < 100) {
-        progress = Math.min(progress + (100 / (minDuration / 100)), 100); // increment every 100ms
-        setAnalysisProgress(Math.floor(progress));
-      }
-    }, 100);
+      const report = analysisResponse.data.data;
+      const duration = analysisResponse.data.analysis_duration || report.analysis_duration;
 
-    // Perform the actual API call
-    let responseData: any = null;
-    let responseError: any = null;
-    try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/detect`, {
-        method: 'POST',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        body: formData,
+      navigate({
+        to: "/result",
+        search: {
+          type: "deepfake",
+          data: {
+            isDeepfake: report.status === "Manipulated",
+            confidence: report.confidenceScore / 100,
+            analysisDuration: duration,
+            details:
+              analysisResponse.data.message ||
+              (report.status === "Manipulated"
+                ? "Multiple manipulation traces detected across the multi-modal neural scan."
+                : "No significant deepfake patterns found. Media appears authentic."),
+          },
+          fileName: file.name,
+          timestamp: new Date().toISOString(),
+        },
       });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.detail || 'Detection failed');
-      }
-      responseData = data;
-      // Store client_id if returned
-      if (data.client_id && !token) {
-        localStorage.setItem('detect_client_id', data.client_id);
-      }
     } catch (err: any) {
-      responseError = err;
-    } finally {
-      setUploading(false);
-    }
+      setIsProcessing(false);
+      setProgress(0);
 
-    const elapsed = Date.now() - (startTimeRef.current || 0);
-    const remaining = Math.max(0, minDuration - elapsed);
-
-    if (responseError) {
-      // If error, stop animations and show error after remaining time or immediately
-      setTimeout(() => {
-        if (statusIntervalRef.current) clearInterval(statusIntervalRef.current);
-        if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
-        setError(responseError.message || 'Something went wrong');
-        setAnalyzing(false);
-      }, remaining);
-    } else if (responseData) {
-      // Wait for minimum duration before finishing
-      setTimeout(() => {
-        finishAnalysis(responseData, file.name, file.type);
-      }, remaining);
+      if (err?.response?.status === 429) {
+        onTriggerLimitModal();
+      } else {
+        toast.error(err?.response?.data?.message || "An error hit the media storage pipeline.");
+      }
     }
   };
-
-  const isAnalyzeDisabled = uploadProgress < 100 || uploading;
 
   return (
-    <PageShell>
-      <section className="max-w-4xl mx-auto px-4 sm:px-6 pt-16 pb-20">
-        <div className="text-center mb-10">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-black/50 backdrop-blur-sm border border-[#6699FF]/30 text-xs font-medium text-gray-300 mb-4">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#F7941D]" />
-            <span>AI Detection Engine · Neo Cloud</span>
-          </div>
-          <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-white">
-            Analyze your <span className="gradient-text">media</span>
-          </h1>
-          <p className="mt-3 text-gray-400">Drop an image, video, or audio file to begin.</p>
-          {!user && (
-            <p className="mt-2 text-xs text-[#F7941D]">
-              Guest: Free scans available. <Link to="/login" className="underline">Login</Link> for higher limits.
-            </p>
-          )}
-          {user && scansRemaining !== undefined && scansRemaining === 0 && (
-            <p className="mt-2 text-xs text-red-400">
-              You have used all your scans. <Link to="/pricing" className="underline">Upgrade</Link> to continue.
-            </p>
-          )}
-        </div>
+    <PanelCard title="Deepfake Detection" icon={<ShieldCheck className="h-5 w-5" />}>
+      <p className="mt-2 text-sm text-muted-foreground">
+        Upload image, video, or audio to detect AI-manipulated faces, voice cloning, and synthetic alterations.
+      </p>
 
-        <AnimatePresence mode="wait">
-          {analyzing ? (
-            <motion.div key="analyzing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              <div className="glass-card text-center py-12">
-                <div className="max-w-md mx-auto mb-8">
-                  <div className="flex justify-between text-sm text-gray-400 mb-2">
-                    <span>Analysis progress</span>
-                    <span>{analysisProgress}%</span>
-                  </div>
-                  <div className="w-full h-3 bg-white/10 rounded-full overflow-hidden">
-                    <div
-                      className="h-full gradient-primary transition-all duration-300 ease-out"
-                      style={{ width: `${analysisProgress}%` }}
-                    />
-                  </div>
-                </div>
-                <div className="h-10 flex items-center justify-center">
-                  <AnimatePresence mode="wait">
-                    <motion.div
-                      key={currentStatusIndex}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                      transition={{ duration: 0.4 }}
-                      className="text-gray-300 text-base font-medium"
-                    >
-                      {STATUSES[currentStatusIndex]}
-                    </motion.div>
-                  </AnimatePresence>
-                </div>
-              </div>
-            </motion.div>
-          ) : !file ? (
-            <motion.div key="drop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+      <div
+        className={`mt-5 flex min-h-52 cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed transition-all ${
+          isProcessing
+            ? "border-[#6699ff]/40 bg-[#6699ff]/5"
+            : isDragging
+            ? "border-[#6699ff] bg-[#6699ff]/20 scale-[0.99]"
+            : file
+              ? "border-[#6699ff]/70 bg-[#6699ff]/15"
+              : "border-[#6699ff]/40 bg-[#6699ff]/10 hover:border-[#6699ff]/70 hover:bg-[#6699ff]/15"
+        } px-4 py-8 text-center`}
+        onClick={() => !isProcessing && fileInputRef.current?.click()}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      >
+        {isProcessing ? (
+          <div className="flex flex-col items-center gap-3">
+            <Loader2 className="h-10 w-10 animate-spin text-[#6699ff]" />
+            <p className="text-sm font-medium text-[#6699ff]">{statusMessage}</p>
+            <div className="w-48 h-1.5 bg-gray-200 rounded-full overflow-hidden">
               <div
-                {...getRootProps()}
-                className={`glass-card border-2 border-dashed transition-all cursor-pointer p-12 text-center
-                  ${
-                    isDragActive
-                      ? "border-[#F7941D] bg-[#F7941D]/5 scale-[1.01]"
-                      : "border-white/15 hover:border-white/30"
-                  }`}
-              >
-                <input {...getInputProps()} />
-                <motion.div
-                  animate={{ y: isDragActive ? -6 : 0 }}
-                  className="w-20 h-20 mx-auto rounded-2xl gradient-primary flex items-center justify-center mb-6"
-                >
-                  <UploadCloud className="w-9 h-9 text-white" />
-                </motion.div>
-                <h3 className="text-xl font-semibold text-white mb-2">
-                  {isDragActive ? "Drop your file here" : "Drag & drop media to scan"}
-                </h3>
-                <p className="text-sm text-gray-400 mb-6">or click to browse from your device</p>
-                <div className="flex flex-wrap items-center justify-center gap-2 text-xs">
-                  {[
-                    { Icon: ImageIcon, label: "JPG · PNG · WEBP" },
-                    { Icon: Video, label: "MP4 · MOV" },
-                    { Icon: Music, label: "MP3 · WAV" },
-                  ].map(({ Icon, label }) => (
-                    <span key={label} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/50 backdrop-blur-sm border border-[#6699FF]/20">
-                      <Icon className="w-3.5 h-3.5 text-[#6699FF]" />
-                      <span className="text-gray-300">{label}</span>
-                    </span>
-                  ))}
-                </div>
-                <p className="text-xs text-gray-500 mt-6">Max file size: 100 MB</p>
-              </div>
-            </motion.div>
-          ) : (
-            <motion.div key="file" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
-              <div className="glass-card">
-                {error && (
-                  <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">
-                    {error}
-                    {error.includes('log in') && (
-                      <Link to="/login" className="underline ml-2 text-[#6699FF]">Login</Link>
-                    )}
-                  </div>
+                className="h-full bg-[#6699ff] transition-all duration-300"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">{Math.round(progress)}%</p>
+          </div>
+        ) : file ? (
+          <div className="flex flex-col items-center gap-3">
+            {previewUrl ? (
+              <img
+                src={previewUrl}
+                alt="Uploaded file preview"
+                className="max-h-32 max-w-full rounded-lg object-contain shadow-sm"
+              />
+            ) : (
+              <div className="p-4 rounded-full bg-[#6699ff]/10">
+                {file.type.startsWith("video/") ? (
+                  <Video className="h-10 w-10 text-[#6699ff]" />
+                ) : (
+                  <Mic className="h-10 w-10 text-[#6699ff]" />
                 )}
-                <div className="flex items-start gap-4">
-                  {preview && file.type.startsWith("image") ? (
-                    <img src={preview} alt="" className="w-24 h-24 object-cover rounded-xl flex-shrink-0" />
-                  ) : preview && file.type.startsWith("video") ? (
-                    <video src={preview} className="w-24 h-24 object-cover rounded-xl flex-shrink-0" />
-                  ) : (
-                    <div className="w-24 h-24 rounded-xl gradient-primary flex items-center justify-center flex-shrink-0">
-                      {(() => {
-                        const Icon = iconFor(file.type);
-                        return <Icon className="w-10 h-10 text-white" />;
-                      })()}
-                    </div>
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="min-w-0">
-                        <h3 className="font-semibold text-white truncate">{file.name}</h3>
-                        <p className="text-xs text-gray-400">
-                          {(file.size / 1024 / 1024).toFixed(2)} MB · {file.type || "unknown"}
-                        </p>
-                      </div>
-                      <button
-                        aria-label="Remove file"
-                        onClick={() => {
-                          setFile(null);
-                          setPreview(null);
-                          setUploadProgress(0);
-                          setError(null);
-                          if (uploadIntervalRef.current) clearInterval(uploadIntervalRef.current);
-                        }}
-                        className="p-2 rounded-lg bg-black/50 backdrop-blur-sm border border-white/10 hover:bg-white/10 transition"
-                      >
-                        <X className="w-4 h-4 text-gray-300" />
-                      </button>
-                    </div>
-                    <div className="mt-4">
-                      <div className="flex justify-between text-xs text-gray-400 mb-1.5">
-                        <span>{uploadProgress < 100 ? "Uploading..." : "Upload complete"}</span>
-                        <span>{uploadProgress}%</span>
-                      </div>
-                      <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden">
-                        <div
-                          className="h-full gradient-primary transition-all duration-200"
-                          style={{ width: `${uploadProgress}%` }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div className="mt-6 flex justify-end gap-2">
-                  <button
-                    onClick={() => {
-                      setFile(null);
-                      setPreview(null);
-                      setError(null);
-                      if (uploadIntervalRef.current) clearInterval(uploadIntervalRef.current);
-                    }}
-                    className="btn-outline"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleAnalyze}
-                    disabled={isAnalyzeDisabled}
-                    className="btn-primary"
-                  >
-                    {uploading ? <Loader2 className="animate-spin inline mr-2" /> : null}
-                    Analyze Media
-                  </button>
-                </div>
               </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </section>
-    </PageShell>
+            )}
+            <div>
+              <p className="text-base font-medium">{file.name}</p>
+              <p className="text-sm text-muted-foreground">
+                {(file.size / 1024 / 1024).toFixed(2)} MB
+              </p>
+            </div>
+          </div>
+        ) : (
+          <>
+            <UploadCloud className="h-8 w-8 text-[#6699ff]" />
+            <p className="mt-3 text-base font-medium">Drag & Drop Media to Scan</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Or <span className="text-[#6699ff] underline">browse files</span>
+            </p>
+          </>
+        )}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*,video/*,audio/*"
+          className="hidden"
+          id="deepfake-file-input"
+          aria-label="Choose a media file to analyze for deepfakes"
+          onChange={(e) => handleFileSelect(e.target.files?.[0] || null)}
+          disabled={isProcessing}
+        />
+      </div>
+      <div className="mt-3 flex flex-col gap-1 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+        <span>Supported: JPG, PNG, MP4, MOV, MP3, WAV</span>
+        <span>Max file size: 100MB</span>
+      </div>
+
+      {file && !isProcessing && (
+        <button
+          onClick={executePipeline}
+          className="mt-5 rounded-full bg-[#6699ff] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[#6699ff]/90 transition-all"
+        >
+          Analyze Media
+        </button>
+      )}
+    </PanelCard>
   );
 }
+
+// ======================= AI CONTENT PANEL (PRODUCTION AWS PIPELINE) =======================
+function AiPanel({ onCheckLimit, onTrackScan, headers, onTriggerLimitModal }: PanelProps) {
+  const navigate = useNavigate();
+  const [textContent, setTextContent] = useState("");
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [statusMessage, setStatusMessage] = useState("");
+
+  const executePipeline = async () => {
+    if (!textContent.trim() || textContent.length < 50) {
+      toast.warning("Please enter at least 50 characters for a meaningful linguistic audit.");
+      return;
+    }
+    if (onCheckLimit()) return;
+
+    setIsProcessing(true);
+    setProgress(5);
+    setStatusMessage("Initializing linguistic forensic environment...");
+
+    try {
+      // Phase 1: Request S3 Target for the text audit log
+      const presignResponse = await axios.post(
+        `${API_BASE_URL}/detection/request-upload`,
+        { fileName: "audit_input.txt", fileType: "text/plain", mode: "text" },
+        { headers }
+      );
+
+      const { presignedUrl, s3Key, fileUrl } = presignResponse.data;
+
+      // Phase 2: Upload raw text to the secure vault
+      setStatusMessage("Uploading text content to secure forensic vault...");
+      setProgress(30);
+
+      await axios.put(presignedUrl, textContent, {
+        headers: { "Content-Type": "text/plain" }
+      });
+
+      // Phase 3: Execute the Text Council deliberation
+      setStatusMessage("Executing deep linguistic pattern analysis...");
+      setProgress(70);
+
+      const analysisResponse = await axios.post(
+        `${API_BASE_URL}/detection/analyze`,
+        { 
+          fileUrl, 
+          s3Key, 
+          fileName: "Linguistic Audit Log", 
+          detectionMode: "text" 
+        },
+        { headers }
+      );
+
+      setProgress(100);
+      onTrackScan();
+      setIsProcessing(false);
+
+      const report = analysisResponse.data.data;
+      const duration = analysisResponse.data.analysis_duration || report.analysis_duration;
+
+      navigate({
+        to: "/result",
+        search: { 
+          type: "ai", 
+          data: {
+            isAIGenerated: report.status === "Manipulated",
+            confidence: report.confidenceScore / 100,
+            analysisDuration: duration,
+            details: analysisResponse.data.message || (report.status === "Manipulated" 
+              ? "Syntactic patterns and uniform perplexity consistent with LLM generation detected." 
+              : "Linguistic variation and structural entropy match human authorship signatures."),
+          }, 
+          fileName: "Linguistic Audit", 
+          timestamp: new Date().toISOString() 
+        }
+      });
+
+    } catch (err: any) {
+      setIsProcessing(false);
+      setProgress(0);
+      if (err?.response?.status === 429) {
+        onTriggerLimitModal();
+      } else {
+        toast.error(err?.response?.data?.message || "Linguistic engine pipeline fault.");
+      }
+    }
+  };
+
+  return (
+    <PanelCard title="Text AI Detection" icon={<FileText className="h-5 w-5" />}>
+      <p className="mt-2 text-sm text-muted-foreground">
+        Paste an essay, article, or message to detect signatures from ChatGPT, Claude, and Gemini using linguistic forensics.
+      </p>
+
+      {isProcessing ? (
+        <div className="mt-5 flex min-h-52 flex-col items-center justify-center rounded-xl border-2 border-dashed border-[#6699ff]/40 bg-[#6699ff]/5 px-4 py-8 text-center">
+          <Loader2 className="h-10 w-10 animate-spin text-[#6699ff]" />
+          <p className="mt-2 text-sm font-medium text-[#6699ff]">{statusMessage}</p>
+          <div className="mt-3 w-48 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-[#6699ff] transition-all duration-300"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">{Math.round(progress)}%</p>
+        </div>
+      ) : (
+        <div className="relative">
+          <textarea
+            id="ai-text-input"
+            rows={8}
+            value={textContent}
+            onChange={(e) => setTextContent(e.target.value)}
+            placeholder="Paste suspect text content here (min 50 characters)..."
+            className="mt-5 w-full rounded-xl border border-input bg-background p-5 text-base outline-none focus:border-[#6699ff] focus:ring-4 focus:ring-[#6699ff]/10 transition-all font-sans leading-relaxed resize-none shadow-inner"
+            disabled={isProcessing}
+            aria-label="Paste suspect text content here"
+          />
+          <div className="absolute bottom-4 right-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+            {textContent.length} Characters
+          </div>
+        </div>
+      )}
+
+      {textContent.trim().length >= 50 && !isProcessing && (
+        <div className="mt-5 flex items-center justify-between">
+          <div className="flex gap-4">
+            <div className="flex items-center gap-1.5">
+              <div className="h-1.5 w-1.5 rounded-full bg-[#6699ff]" />
+              <span className="text-[10px] font-black uppercase text-slate-500">Perplexity</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="h-1.5 w-1.5 rounded-full bg-[#6699ff]" />
+              <span className="text-[10px] font-black uppercase text-slate-500">Burstiness</span>
+            </div>
+          </div>
+          <button
+            onClick={executePipeline}
+            className="rounded-full bg-[#6699ff] px-8 py-3 text-sm font-bold text-white shadow-lg hover:bg-[#5588ee] hover:shadow-[#6699ff]/25 transition-all cursor-pointer"
+          >
+            Run Linguistic Audit
+          </button>
+        </div>
+      )}
+    </PanelCard>
+  );
+}
+
+
