@@ -28,6 +28,35 @@ const optionalAuth = (req: Request, res: Response, next: any) => {
   next();
 };
 
+// ==========================================
+// ROUTE 0: GET /api/detection/usage
+// DESC:    Fetch the current scan usage and total limit for the user/guest
+// ==========================================
+router.get('/usage', optionalAuth, async (req: Request, res: Response) => {
+  try {
+    const isLoggedIn = !!req.user;
+    const identifier = isLoggedIn ? req.user!.id : (req.ip || req.socket.remoteAddress || 'unknown-guest');
+    
+    const maxAllowedScans = isLoggedIn ? 8 : 3;
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+    const completedScansCount = await ScanHistory.countDocuments({
+      userId: identifier,
+      createdAt: { $gte: twentyFourHoursAgo },
+    });
+
+    return res.json({
+      success: true,
+      usage: completedScansCount,
+      limit: maxAllowedScans,
+      isLoggedIn
+    });
+  } catch (error) {
+    console.error('🔴 Usage Fetch Error:', (error as Error).message);
+    return res.status(500).json({ success: false, message: 'Internal server error fetching usage stats.' });
+  }
+});
+
 // Explicit type definitions for incoming request objects
 interface RequestUploadBody {
   fileName: string;
@@ -40,7 +69,7 @@ interface AnalyzeRequestBody {
   url?: string;
   s3Key?: string;
   fileName: string;
-  detectionMode: 'audio' | 'image' | 'video' | 'text';
+  detectionMode: 'audio' | 'image' | 'video' | 'text' | 'phishing';
 }
 
 // ==========================================
@@ -107,11 +136,8 @@ router.post('/analyze', optionalAuth, checkRateLimit, async (
     const isGuest = !req.user;
 
     // 1. Map incoming mode parameter directly to the correct Python FastAPI target endpoint URL
-    let targetEndpoint = 'predict-council'; // Use council by default for multi-modal synthesis
-    if (detectionMode === 'audio') targetEndpoint = 'predict-council';
-    else if (detectionMode === 'video' || detectionMode === 'image') targetEndpoint = 'predict-council';
-    else if (detectionMode === 'text') targetEndpoint = 'predict-council';
-
+    let targetEndpoint = 'predict-council'; 
+    
     const pythonServerUrl = `${process.env.PYTHON_AI_URL || 'http://localhost:8000'}`;
     
     // 1.5 Generate a GET presigned URL for the Python backend if we have an s3Key to bypass public access issues
@@ -131,14 +157,15 @@ router.post('/analyze', optionalAuth, checkRateLimit, async (
     }
 
     console.log(`🤖 [GATEWAY] Routing token to AI Framework -> [${pythonServerUrl}/${targetEndpoint}]`);
-    const displayUrl = accessUrl ? String(accessUrl) : '';
+    const displayUrl = accessUrl ? String(accessUrl) : (url || '');
     console.log(`   [ASSET] ${displayUrl.substring(0, 100)}${displayUrl.length > 100 ? '...' : ''}`);
     
     const gatewayStart = Date.now();
     // 2. Transmit standard payload to target AI engine channel
     const aiResponse = await axios.post(`${pythonServerUrl}/${targetEndpoint}`, { 
       fileUrl: accessUrl,
-      detectionMode: detectionMode // Ensure detectionMode is passed
+      url: url, // Pass raw URL for phishing
+      detectionMode: detectionMode 
     });
     const aiData = aiResponse.data;
     const gatewayDuration = ((Date.now() - gatewayStart) / 1000).toFixed(2);
@@ -153,7 +180,7 @@ router.post('/analyze', optionalAuth, checkRateLimit, async (
     let mappedStatus: 'Authentic' | 'Manipulated' = 'Authentic';
     if (rawStatus === 'fake' || rawStatus === 'synthetic' || rawStatus === 'manipulated' || aiData.is_synthetic === true) {
       mappedStatus = 'Manipulated';
-    } else if (rawStatus === 'conflicted') {
+    } else if (rawStatus === 'conflicted' || rawStatus === 'malicious') {
       mappedStatus = confidenceScore > 50 ? 'Manipulated' : 'Authentic';
     }
 
@@ -162,8 +189,8 @@ router.post('/analyze', optionalAuth, checkRateLimit, async (
       userId,
       isGuest,
       fileName,
-      s3Url: fileUrl,
-      s3Key,
+      s3Url: fileUrl || url || 'phishing-url-scan',
+      s3Key: s3Key || 'phishing-no-s3',
       confidenceScore: confidenceScore,
       status: mappedStatus,
       detectionMode: detectionMode as any,

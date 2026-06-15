@@ -17,13 +17,14 @@ from detectors import (
     SyntheticMediaDetector,
     HFInferenceDetector
 )
+from audio_model.local_audio_heuristics import analyze_audio_heuristics
 
 # Load environment variables
 load_dotenv()
 
 # Constants
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-AUDIO_MODEL_PATH = os.path.join(SCRIPT_DIR, "audio-model")
+AUDIO_MODEL_PATH = os.path.join(SCRIPT_DIR, "audio_model")
 VISION_MODEL_PATH = os.path.join(
     SCRIPT_DIR, "vision-model/deepfake_face_detector.pth")
 VISION_FACE_DETECTOR_PATH = os.path.join(
@@ -122,6 +123,11 @@ def run_telemetry(file_path: str, file_type: str) -> Dict[str, Any]:
                 a_label, a_conf = audio.predict(audio_bytes)
                 telemetry["audio_model"] = {
                     "verdict": a_label, "confidence": a_conf}
+                
+                # Run Local Audio Heuristics (Pre-filtering Layer)
+                print("    -> Running Local Audio Heuristics (Structural Analysis)...")
+                heuristics = analyze_audio_heuristics(file_path)
+                telemetry["audio_heuristics"] = heuristics
         except Exception as e:
             telemetry["audio_model"] = {
                 "error": f"Audio processing failed: {str(e)}"}
@@ -157,7 +163,7 @@ def run_stage_1(file_path: str, file_type: str, telemetry: Dict[str, Any]) -> Di
     if not GEMINI_API_KEY:
         return {"error": "GEMINI_API_KEY missing"}
 
-    model = genai.GenerativeModel(model_name="gemini-1.5-flash")
+    model = genai.GenerativeModel(model_name="gemini-2.5-flash")
 
     # Upload file for multimodal analysis
     uploaded_file = upload_to_gemini(file_path)
@@ -216,7 +222,7 @@ def run_stage_2(telemetry: Dict[str, Any], stage1_output: Dict[str, Any]) -> Dic
     if not GEMINI_API_KEY:
         return local_audit_fallback(telemetry, stage1_output)
 
-    model = genai.GenerativeModel(model_name="gemini-1.5-flash")
+    model = genai.GenerativeModel(model_name="gemini-2.5-flash")
 
     audit_prompt = f"""
     You are the Stage 2 Verification Engine. Your mandate is to audit Stage 1 and Raw Telemetry to produce a FINAL verified forensic report.

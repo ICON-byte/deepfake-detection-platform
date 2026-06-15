@@ -1,5 +1,6 @@
 import express, { Application, Request, Response } from 'express';
 import cors from 'cors';
+import compression from 'compression';
 import dotenv from 'dotenv';
 import { connectDB } from './config/db';
 import authRoutes from './routes/auth';
@@ -17,6 +18,7 @@ connectDB();
 
 // 4. Mount Global Cross-Cutting Middlewares
 app.use(cors()); // Permits your frontend domain to make secure API requests
+app.use(compression()); // Compress all responses for faster data delivery
 app.use(express.json()); // Automatically parses incoming raw JSON payloads on req.body
 
 // 5. Mount API Modular Routes

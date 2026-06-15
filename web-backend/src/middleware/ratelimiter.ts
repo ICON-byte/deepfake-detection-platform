@@ -11,8 +11,8 @@ export const checkRateLimit = async (
     const isLoggedIn = !!req.user;
     const identifier = isLoggedIn ? req.user!.id : (req.ip || req.socket.remoteAddress || 'unknown-guest');
     
-    // Dynamic cap allocation: Logged in users get 3, Guests get 2
-    const maxAllowedScans = isLoggedIn ? 3 : 2;
+    // Dynamic cap allocation: Logged in users get 8, Guests get 3
+    const maxAllowedScans = isLoggedIn ? 8 : 3;
 
     // 2. Define the rolling 24-hour window boundaries
     const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
@@ -26,8 +26,8 @@ export const checkRateLimit = async (
     // 4. If they hit or cross their threshold, reject the request
     if (completedScansCount >= maxAllowedScans) {
       const errorMessage = isLoggedIn
-        ? 'You have reached your limit of 3 scans per 24 hours.'
-        : 'You have reached your guest limit of 2 free scans per 24 hours. Please create an account or log in to get more scans!';
+        ? `You have reached your daily limit of ${maxAllowedScans} scans.`
+        : `You have reached your guest limit of ${maxAllowedScans} free scans. Please create an account or log in to get more scans!`;
 
       return res.status(429).json({
         success: false,

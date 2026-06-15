@@ -18,6 +18,7 @@ import {
 import { useState, useRef, useEffect } from "react";
 import axios from "axios";
 import { toast } from "sonner";
+import imageCompression from "browser-image-compression";
 
 // Target backend API base configuration - Using relative path to leverage Vite proxy
 const API_BASE_URL = "/api";
@@ -40,12 +41,13 @@ export const Route = createFileRoute("/detect")({
   component: DetectPage,
 });
 
-type Tab = "deepfake" | "ai";
+type Tab = "deepfake" | "ai" | "phishing";
 
 function DetectPage() {
   const [tab, setTab] = useState<Tab>("deepfake");
   const [showLimitModal, setShowLimitModal] = useState(false);
   const [authHeaders, setAuthHeaders] = useState<Record<string, string>>({});
+  const [usageStats, setUsageStats] = useState<{ usage: number; limit: number } | null>(null);
 
   // Initialize auth headers on mount (client-side only)
   useEffect(() => {
@@ -53,12 +55,31 @@ function DetectPage() {
     if (token) {
       setAuthHeaders({ Authorization: `Bearer ${token}` });
     }
+    fetchUsage(token);
   }, []);
+
+  const fetchUsage = async (token?: string | null) => {
+    try {
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const res = await axios.get(`${API_BASE_URL}/detection/usage`, { headers });
+      if (res.data.success) {
+        setUsageStats({ usage: res.data.usage, limit: res.data.limit });
+      }
+    } catch (err) {
+      console.error("Failed to fetch usage stats:", err);
+    }
+  };
 
   // Helper hook to check authentication and manage session-based free local usage
   const checkGuestLimitReached = (): boolean => {
     const token = localStorage.getItem("truthlens_token");
-    if (token) return false; // Authenticated users have unlimited access
+    if (token) {
+      if (usageStats && usageStats.usage >= usageStats.limit) {
+        setShowLimitModal(true);
+        return true;
+      }
+      return false;
+    }; 
 
     const currentScans = parseInt(sessionStorage.getItem("truthlens_guest_scans") || "0", 10);
     if (currentScans >= 3) {
@@ -75,6 +96,7 @@ function DetectPage() {
       const currentScans = parseInt(sessionStorage.getItem("truthlens_guest_scans") || "0", 10);
       sessionStorage.setItem("truthlens_guest_scans", (currentScans + 1).toString());
     }
+    fetchUsage(token);
   };
 
   return (
@@ -90,15 +112,41 @@ function DetectPage() {
             <p className="mx-auto mt-4 max-w-2xl text-base text-muted-foreground sm:text-lg">
               Select a workflow below, then upload files or paste content for real-time deepfake and AI analysis.
             </p>
+
+            {/* 📈 DAILY LIMIT VISUALIZER */}
+            {usageStats && (
+              <div className="mx-auto mt-8 max-w-xs animate-in fade-in slide-in-from-bottom-4 duration-700">
+                <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
+                  <span>Daily Scan Limit</span>
+                  <span>{usageStats.usage} / {usageStats.limit} Used</span>
+                </div>
+                <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden border border-slate-200">
+                  <div 
+                    className={`h-full rounded-full transition-all duration-1000 ease-out ${
+                      usageStats.usage >= usageStats.limit ? "bg-red-500" : "bg-[#6699ff]"
+                    }`}
+                    style={{ width: `${(usageStats.usage / usageStats.limit) * 100}%` }}
+                  />
+                </div>
+                <p className="mt-2 text-[10px] text-slate-400 font-medium">
+                  {usageStats.usage >= usageStats.limit 
+                    ? "Limit reached. Resets in 24 hours." 
+                    : `${usageStats.limit - usageStats.usage} scans remaining today.`}
+                </p>
+              </div>
+            )}
           </div>
 
-          <div className="mx-auto mt-10 max-w-2xl bg-gray-100/60 border border-gray-200/60 p-1 rounded-3xl sm:rounded-full shadow-inner">
-            <div className="grid grid-cols-1 gap-1 sm:grid-cols-2 items-center">
+          <div className="mx-auto mt-10 max-w-4xl bg-gray-100/60 border border-gray-200/60 p-1 rounded-3xl sm:rounded-full shadow-inner">
+            <div className="grid grid-cols-1 gap-1 sm:grid-cols-3 items-center">
               <TabBtn active={tab === "deepfake"} onClick={() => setTab("deepfake")}>
                 Deepfake Detect
               </TabBtn>
               <TabBtn active={tab === "ai"} onClick={() => setTab("ai")}>
                 Text AI Detection
+              </TabBtn>
+              <TabBtn active={tab === "phishing"} onClick={() => setTab("phishing")}>
+                Phishing Detect
               </TabBtn>
             </div>
           </div>
@@ -120,11 +168,20 @@ function DetectPage() {
                 onTriggerLimitModal={() => setShowLimitModal(true)}
               />
             )}
+            {tab === "phishing" && (
+              <PhishingPanel 
+                onCheckLimit={checkGuestLimitReached} 
+                onTrackScan={incrementGuestScanCount} 
+                headers={authHeaders}
+                onTriggerLimitModal={() => setShowLimitModal(true)}
+              />
+            )}
           </div>
         </div>
       </section>
 
-      {/* 🛑 GUEST RATE LIMIT REACHED OVERLAY MODAL */}
+
+      {/* 🛑 RATE LIMIT REACHED OVERLAY MODAL */}
       {showLimitModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
           <div className="relative w-full max-w-md rounded-2xl border border-gray-100 bg-white p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
@@ -142,24 +199,47 @@ function DetectPage() {
               </div>
               <h3 className="mt-4 text-xl font-bold text-gray-900">Scan Limit Reached</h3>
               <p className="mt-2 text-sm text-gray-500">
-                You've used your 3 free anonymous scans! Protect your data, unlock full breakdown parameters, and maintain an audit history by creating an account.
+                {localStorage.getItem("truthlens_token") 
+                  ? "You've reached your daily limit of 8 scans! Maintain your security audit by reviewing your past detections in the history dashboard."
+                  : "You've used your 3 free anonymous scans! Protect your data, unlock full breakdown parameters, and maintain an audit history by creating an account."
+                }
               </p>
               
               <div className="mt-6 flex w-full flex-col gap-2">
-                <Link
-                  to="/register"
-                  onClick={() => setShowLimitModal(false)}
-                  className="flex w-full items-center justify-center rounded-xl bg-[#6699ff] py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#6699ff]/90 transition-colors"
-                >
-                  Sign Up For Free
-                </Link>
-                <Link
-                  to="/login"
-                  onClick={() => setShowLimitModal(false)}
-                  className="flex w-full items-center justify-center rounded-xl border border-gray-200 bg-white py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-                >
-                  Log In
-                </Link>
+                {localStorage.getItem("truthlens_token") ? (
+                  <>
+                    <Link
+                      to="/history"
+                      onClick={() => setShowLimitModal(false)}
+                      className="flex w-full items-center justify-center rounded-xl bg-[#6699ff] py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#6699ff]/90 transition-colors"
+                    >
+                      View My History
+                    </Link>
+                    <button
+                      onClick={() => setShowLimitModal(false)}
+                      className="flex w-full items-center justify-center rounded-xl border border-gray-200 bg-white py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                    >
+                      Dismiss
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <Link
+                      to="/register"
+                      onClick={() => setShowLimitModal(false)}
+                      className="flex w-full items-center justify-center rounded-xl bg-[#6699ff] py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#6699ff]/90 transition-colors"
+                    >
+                      Sign Up For Free
+                    </Link>
+                    <Link
+                      to="/login"
+                      onClick={() => setShowLimitModal(false)}
+                      className="flex w-full items-center justify-center rounded-xl border border-gray-200 bg-white py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                    >
+                      Log In
+                    </Link>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -303,7 +383,6 @@ function DeepfakePanel({ onCheckLimit, onTrackScan, headers, onTriggerLimitModal
 
     setIsProcessing(true);
     setProgress(5);
-    setStatusMessage("Requesting secure upload verification signature...");
 
     try {
       const isImage = file.type.startsWith("image/");
@@ -311,10 +390,30 @@ function DeepfakePanel({ onCheckLimit, onTrackScan, headers, onTriggerLimitModal
       const isAudio = file.type.startsWith("audio/");
       const mode = isAudio ? "audio" : (isVideo ? "video" : "image");
 
+      let fileToUpload = file;
+
+      // Optional: Client-side compression for images to boost speed
+      if (isImage) {
+        setStatusMessage("Optimizing image resolution for forensic analysis...");
+        try {
+          const options = {
+            maxSizeMB: 1,
+            maxWidthOrHeight: 1920,
+            useWebWorker: true,
+          };
+          fileToUpload = await imageCompression(file, options);
+          console.log(`Image compressed from ${(file.size / 1024 / 1024).toFixed(2)}MB to ${(fileToUpload.size / 1024 / 1024).toFixed(2)}MB`);
+        } catch (compressionError) {
+          console.error("Compression failed, using original file:", compressionError);
+        }
+      }
+
+      setStatusMessage("Requesting secure upload verification signature...");
+
       // Phase 1: Call gateway to acquire AWS Presigned Upload Target
       const presignResponse = await axios.post(
         `${API_BASE_URL}/detection/request-upload`,
-        { fileName: file.name, fileType: file.type, mode: mode },
+        { fileName: file.name, fileType: fileToUpload.type, mode: mode },
         { headers }
       );
 
@@ -324,8 +423,8 @@ function DeepfakePanel({ onCheckLimit, onTrackScan, headers, onTriggerLimitModal
       setStatusMessage(`Uploading ${mode} securely to AWS S3 storage vault...`);
       setProgress(25);
 
-      await axios.put(presignedUrl, file, {
-        headers: { "Content-Type": file.type },
+      await axios.put(presignedUrl, fileToUpload, {
+        headers: { "Content-Type": fileToUpload.type },
         onUploadProgress: (progressEvent) => {
           if (progressEvent.total) {
             const percentage = Math.round((progressEvent.loaded * 45) / progressEvent.total);
@@ -621,5 +720,139 @@ function AiPanel({ onCheckLimit, onTrackScan, headers, onTriggerLimitModal }: Pa
     </PanelCard>
   );
 }
+
+// ======================= PHISHING PANEL (DIRECT API AUDIT) =======================
+function PhishingPanel({ onCheckLimit, onTrackScan, headers, onTriggerLimitModal }: PanelProps) {
+  const navigate = useNavigate();
+  const [url, setUrl] = useState("");
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [statusMessage, setStatusMessage] = useState("");
+
+  const executePipeline = async () => {
+    if (!url.trim()) {
+      toast.warning("Please enter a URL to audit for phishing.");
+      return;
+    }
+    
+    // Simple URL validation
+    try {
+      new URL(url.startsWith('http') ? url : `https://${url}`);
+    } catch (e) {
+      toast.error("Please enter a valid URL (e.g. google.com or https://secure-login.com)");
+      return;
+    }
+
+    if (onCheckLimit()) return;
+
+    setIsProcessing(true);
+    setProgress(10);
+    setStatusMessage("Connecting to phishing heuristic engine...");
+
+    try {
+      // Phishing is a direct POST to /analyze with the URL string
+      const analysisResponse = await axios.post(
+        `${API_BASE_URL}/detection/analyze`,
+        { 
+          url: url,
+          fileName: `URL Audit: ${url.substring(0, 30)}`,
+          detectionMode: "phishing" 
+        },
+        { headers }
+      );
+
+      setProgress(100);
+      onTrackScan();
+      setIsProcessing(false);
+
+      const report = analysisResponse.data.data;
+      const duration = analysisResponse.data.analysis_duration || report.analysis_duration;
+
+      navigate({
+        to: "/result",
+        search: { 
+          type: "phishing", 
+          data: {
+            isPhishing: report.status === "Manipulated",
+            confidence: report.confidenceScore / 100,
+            analysisDuration: duration,
+            details: analysisResponse.data.message || (report.status === "Manipulated" 
+              ? "This URL exhibits patterns consistent with credential harvesting and high-risk domain spoofing." 
+              : "Domain reputation and structural heuristics suggest this URL is safe and authentic."),
+            targetUrl: url
+          }, 
+          fileName: "URL Audit Log", 
+          timestamp: new Date().toISOString() 
+        }
+      });
+
+    } catch (err: any) {
+      setIsProcessing(false);
+      setProgress(0);
+      if (err?.response?.status === 429) {
+        onTriggerLimitModal();
+      } else {
+        toast.error(err?.response?.data?.message || "Phishing engine connection failure.");
+      }
+    }
+  };
+
+  return (
+    <PanelCard title="Phishing Link Audit" icon={<Link2 className="h-5 w-5" />}>
+      <p className="mt-2 text-sm text-muted-foreground">
+        Scan suspicious links, SMS lures, and email redirects to detect domain spoofing and malicious intent.
+      </p>
+
+      {isProcessing ? (
+        <div className="mt-5 flex min-h-52 flex-col items-center justify-center rounded-xl border-2 border-dashed border-[#6699ff]/40 bg-[#6699ff]/5 px-4 py-8 text-center">
+          <Loader2 className="h-10 w-10 animate-spin text-[#6699ff]" />
+          <p className="mt-2 text-sm font-medium text-[#6699ff]">{statusMessage}</p>
+          <div className="mt-3 w-48 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-[#6699ff] transition-all duration-300"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">{Math.round(progress)}%</p>
+        </div>
+      ) : (
+        <div className="relative">
+          <input
+            type="text"
+            id="phishing-url-input"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            placeholder="Paste suspicious URL here (e.g. login-secure-bank.com)..."
+            className="mt-5 w-full rounded-xl border border-input bg-background p-5 text-base outline-none focus:border-[#6699ff] focus:ring-4 focus:ring-[#6699ff]/10 transition-all font-sans leading-relaxed shadow-inner"
+            disabled={isProcessing}
+            aria-label="Paste suspicious URL here"
+          />
+        </div>
+      )}
+
+      {!isProcessing && (
+        <div className="mt-5 flex items-center justify-between">
+          <div className="flex gap-4">
+            <div className="flex items-center gap-1.5">
+              <div className="h-1.5 w-1.5 rounded-full bg-[#6699ff]" />
+              <span className="text-[10px] font-black uppercase text-slate-500">Tld Extract</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="h-1.5 w-1.5 rounded-full bg-[#6699ff]" />
+              <span className="text-[10px] font-black uppercase text-slate-500">Heuristics</span>
+            </div>
+          </div>
+          <button
+            onClick={executePipeline}
+            className="rounded-full bg-[#6699ff] px-8 py-3 text-sm font-bold text-white shadow-lg hover:bg-[#5588ee] hover:shadow-[#6699ff]/25 transition-all cursor-pointer"
+          >
+            Audit Link
+          </button>
+        </div>
+      )}
+    </PanelCard>
+  );
+}
+
 
 
