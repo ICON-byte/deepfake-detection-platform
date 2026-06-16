@@ -206,7 +206,8 @@ router.post('/analyze', optionalAuth, checkRateLimit, async (
       success: true,
       data: finalizedReport,
       analysis_duration: aiData.analysis_duration,
-      message: aiData.rationale || undefined
+      message: aiData.rationale || undefined,
+      dynamicFactors: aiData.dynamic_factors || undefined
     });
 
   } catch (error: any) {

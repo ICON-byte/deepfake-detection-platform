@@ -79,18 +79,53 @@ export function AnalysisChart({ data, color = "#6699ff" }: AnalysisChartProps) {
         </ChartContainer>
       </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-10 border-t border-slate-100 pt-8">
-        {data.map((item, i) => (
-          <div key={i} className="flex flex-col relative">
-            <div className="flex items-center gap-2 mb-2">
-              <div className={`h-2 w-2 rounded-full ${item.value > 70 ? (color === "#6699ff" ? "bg-red-500" : "bg-amber-500") : "bg-emerald-500"}`} />
-              <p className="text-[10px] font-black uppercase tracking-[0.1em] text-slate-900">{item.label}</p>
-            </div>
-            <p className="text-[12px] text-slate-600 leading-relaxed font-medium pl-4 border-l-2 border-slate-100 italic">
-              "{item.description}"
-            </p>
-          </div>
-        ))}
+      <div className="mt-10 border-t border-slate-100 pt-8">
+        <div className="flex items-center gap-2 mb-4">
+          <p className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400">Forensic Data Registry</p>
+        </div>
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <table className="w-full text-left text-sm border-collapse">
+            <thead className="bg-slate-50/50 border-b border-slate-200">
+              <tr>
+                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-500">Metric Parameter</th>
+                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-500 text-center">Score</th>
+                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-500 text-center">Status</th>
+                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-500 hidden md:table-cell">Forensic Description</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {data.map((item, i) => {
+                const isWarning = item.value > 70;
+                const statusColor = isWarning 
+                  ? (color === "#6699ff" ? "text-red-600 bg-red-50 border-red-100" : "text-amber-600 bg-amber-50 border-amber-100") 
+                  : "text-emerald-600 bg-emerald-50 border-emerald-100";
+                
+                return (
+                  <tr key={i} className="hover:bg-slate-50/50 transition-colors">
+                    <td className="px-6 py-4">
+                      <p className="font-bold text-slate-900">{item.label}</p>
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <span className={`text-sm font-black ${isWarning ? (color === "#6699ff" ? "text-red-600" : "text-amber-600") : "text-emerald-600"}`}>
+                        {item.value}%
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-black border ${statusColor}`}>
+                        {isWarning ? "SUSPICIOUS" : "CLEAN"}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 hidden md:table-cell">
+                      <p className="text-xs text-slate-500 font-medium italic leading-relaxed">
+                        "{item.description}"
+                      </p>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

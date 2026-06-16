@@ -1,4 +1,4 @@
-from detectors import DeepfakeAudioDetector, DeepfakeVisionDetector, DeepfakeTextDetector, PhishingDetector, SightengineDetector
+from detectors import DeepfakeAudioDetector, DeepfakeVisionDetector, DeepfakeTextDetector, PhishingDetector, PhishingDetectorVT, SightengineDetector
 from audio_model.local_audio_heuristics import analyze_audio_heuristics
 import os
 import requests
@@ -14,7 +14,8 @@ from fastapi.middleware.cors import CORSMiddleware
 import tempfile
 import warnings
 from dotenv import load_dotenv
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 
 # Global Warning Filters
 warnings.filterwarnings("ignore")
@@ -28,12 +29,32 @@ except ImportError:
 # Load environment variables
 load_dotenv()
 
-# Configure Gemini API
-GEMINI_API_KEY = os.getenv("Gemini_Api_Key") or os.getenv("GEMINI_API_KEY")
+# Force check and clean the API keys
+raw_gemini_key = os.getenv("Gemini_Api_Key") or os.getenv("GEMINI_API_KEY")
+GEMINI_API_KEY = raw_gemini_key.strip() if raw_gemini_key else None
+
+raw_vt_key = os.getenv("VT_API_KEY")
+VT_API_KEY = raw_vt_key.strip() if raw_vt_key else None
+
+# Debugging prints to catch anomalies
 if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
+    # Prints first 4 and last 4 characters to help you verify it's the right key 
+    # without exposing it in logs completely.
+    masked_key = f"{GEMINI_API_KEY[:4]}...{GEMINI_API_KEY[-4:]}"
+    print(f" [+] Found Gemini Key in env: {masked_key}")
+    
+    try:
+        gemini_client = genai.Client(api_key=GEMINI_API_KEY)
+        print(" [+] Gemini dynamic inference engine activated.")
+    except Exception as e:
+        gemini_client = None
+        print(f" [!] Error initializing GenAI Client object: {e}")
 else:
+    gemini_client = None
     print("[!] WARNING: Gemini_Api_Key missing in .env. Dynamic LLM rationale will fail.")
+
+if not VT_API_KEY:
+    print("[!] WARNING: VT_API_KEY missing in .env. Phishing cross-checks will fail.")
 
 # Configure FastAPI
 app = FastAPI(title="TruthLens AI Core Engine")
@@ -100,11 +121,22 @@ except Exception as e:
     text_model = None
 
 try:
-    phishing_model = PhishingDetector(PHISHING_MODEL_PATH, PHISHING_SCALER_PATH, PHISHING_WHITELIST_PATH)
+    phishing_model = PhishingDetector(
+        PHISHING_MODEL_PATH, PHISHING_SCALER_PATH, PHISHING_WHITELIST_PATH)
     print(" [+] Phishing engine activated.")
 except Exception as e:
     print(f" [!] Phishing engine failed: {str(e)}")
     phishing_model = None
+
+try:
+    if VT_API_KEY:
+        vt_phishing_model = PhishingDetectorVT(VT_API_KEY)
+        print(" [+] VirusTotal cross-check engine activated.")
+    else:
+        vt_phishing_model = None
+except Exception as e:
+    print(f" [!] VT Phishing engine failed: {str(e)}")
+    vt_phishing_model = None
 
 try:
     api_user = os.getenv("SIGHTENGINE_API_USER")
@@ -146,18 +178,49 @@ async def predict_council(payload: DetectionRequest):
     # Special case: Phishing analysis usually targets a string URL, not a file upload
     if mode == "phishing":
         if not target_url:
-            raise HTTPException(status_code=400, detail="url is required for phishing analysis.")
-        
-        if phishing_model:
+            raise HTTPException(
+                status_code=400, detail="url is required for phishing analysis.")
+
+        # Priority 1: VirusTotal (Primary Engine as requested)
+        if vt_phishing_model:
+            print(
+                f" [*] [PHISHING] Routing to VirusTotal Primary Engine: {target_url[:50]}...")
+            vt_report = await run_in_executor(vt_phishing_model.predict, target_url)
+
+            if vt_report.get("status") != "Error":
+                report = {
+                    "is_synthetic": vt_report["is_synthetic"],
+                    "status": vt_report["status"],
+                    "confidence_score": vt_report["confidence_score"],
+                    "rationale": vt_report["rationale"],
+                    "breakdown": {
+                        # Weight for chart
+                        "urlAnalysis": vt_report.get("malicious", 0) * 10,
+                        "domainReputation": vt_report.get("harmless", 0),
+                        "structuralHeuristics": vt_report.get("suspicious", 0) * 20
+                    }
+                }
+                # Add VT specific metadata
+                report["vt_permalink"] = vt_report.get("permalink")
+            else:
+                print(
+                    " [!] VirusTotal Engine failed, falling back to local heuristics.")
+                vt_report = None
+        else:
+            vt_report = None
+
+        # Priority 2: Fallback to Local Heuristics if VT is missing or failed
+        if not vt_report and phishing_model:
             status, confidence = await run_in_executor(phishing_model.predict, target_url)
             report = {
                 "is_synthetic": status == "Manipulated",
                 "status": status,
                 "confidence_score": confidence,
-                "rationale": f"Suspicious phishing markers detected in URL: {target_url}" if status == "Manipulated" else "URL appears to be a legitimate domain based on heuristic reputation."
+                "rationale": f"Local heuristic check: {status} patterns detected in URL."
             }
-        else:
-            raise HTTPException(status_code=500, detail="Phishing model not loaded.")
+        elif not vt_report:
+            raise HTTPException(
+                status_code=500, detail="No phishing detection engines available.")
 
         duration = round(time.time() - start_time, 2)
         report["analysis_duration"] = duration
@@ -224,20 +287,18 @@ async def predict_council(payload: DetectionRequest):
                 len(audio_confidences) if audio_confidences else 0
 
             # HEURISTIC PENALTY LOGIC:
-            # If heuristics detect strong AI signatures (62+), we penalize the "Authentic" verdict
+            # If heuristics detect strong AI signatures (62+), we heavily boost the "Fakeness" probability
             # A score of 62+ means at least one definitive generative structural artifact was found.
             final_is_synthetic = syn_count > 0  # If neural model or heuristics flag it
             final_confidence = avg_neural_conf
 
             if not final_is_synthetic and h_score >= 62:
-                # If neural model thinks it's real, but structural heuristics see AI fingerprints:
-                # We reduce the confidnce of it being "Authentic"
-                # Cap penalty to avoid total flip on weak signals
-                penalty = min(h_score, 40)
-                final_confidence = max(5, final_confidence - penalty)
-                if final_confidence < 45:
+                # If neural model thinks it's real (e.g. 5% fake), but structural heuristics see AI fingerprints:
+                # We boost the fakeness probability
+                penalty = min(h_score, 40) # up to +40% fakeness
+                final_confidence = min(95, final_confidence + penalty)
+                if final_confidence >= 45:
                     final_is_synthetic = True
-                    final_confidence = 100 - final_confidence
 
             # Special case: If neural model flagged it, keep it flagged
             if syn_count > 0:
@@ -300,11 +361,10 @@ async def predict_council(payload: DetectionRequest):
                         "rationale": "Image Analysis"
                     }
 
-        # Optional: Use Gemini to generate a human-readable forensic summary
-        if GEMINI_API_KEY:
+        # Optional: Use Gemini to generate a human-readable forensic summary and dynamic factors
+        if gemini_client:
             try:
-                print(" [*] [GEMINI] Generating dynamic forensic summary...")
-                model = genai.GenerativeModel("gemini-2.5-flash")
+                print(" [*] [GEMINI] Generating dynamic forensic summary and factors...")
 
                 # We need to map our simple status to the 5-tier system for the prompt
                 threat_level = "CLEAN"
@@ -334,7 +394,7 @@ async def predict_council(payload: DetectionRequest):
                         verdict = "UNCERTAIN"
 
                 prompt = f"""
-You are an expert Media Forensics Analyst and Security Communications Specialist. Your role is to take raw mathematical data from an AI multimedia threat detection scan and generate a clear, human-readable "Forensic Executive Summary".
+You are an expert Media Forensics Analyst and Security Communications Specialist. Your role is to take raw mathematical data from an AI multimedia threat detection scan and generate a clear, human-readable "Forensic Executive Summary" along with 3 specific forensic metrics tailored to the media type.
 
 [SCAN DATA]
 - Media Type: {mode}
@@ -344,15 +404,32 @@ You are an expert Media Forensics Analyst and Security Communications Specialist
 - Sensor Rationale: {report['rationale']}
 
 [INSTRUCTIONS]
-1. Write a single natural language paragraph assessing the file's digital provenance based on the final verdict.
-2. Tailor the language to the media type (e.g., talk about acoustic artifacts for audio, frames/containers for video, or pixel patterns for images).
-3. If the file is AI_GENERATED or LIKELY_AI, point out that structural anomalies or sensor flags strongly indicate synthesis.
-4. DO NOT include the C2PA disclaimer in this text (the frontend handles that).
-5. DO NOT use markdown, just return the raw text paragraph.
+Return ONLY a valid JSON object with the following schema:
+{{
+  "rationale": "A single natural language paragraph assessing the file's digital provenance based on the final verdict. Tailor the terminology strictly to the media type (e.g., acoustic artifacts/spectrograms for audio, spatial coherence/compression blocks for video, pixel patterns/noise for images, semantic burstiness for text). DO NOT include the C2PA disclaimer.",
+  "factors": [
+    {{
+      "label": "Short Metric Name (e.g., 'Lighting Analysis' or 'Vocal Pitch')",
+      "value": 85, // An integer score between 0 and 100
+      "description": "A short, 1-sentence technical description of what this metric evaluated."
+    }}
+  ]
+}}
 """
-                response = model.generate_content(prompt)
+                response = await gemini_client.aio.models.generate_content(
+                    model='gemini-2.5-flash',
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                    )
+                )
+                
                 if response and response.text:
-                    report["rationale"] = response.text.strip()
+                    gemini_data = json.loads(response.text)
+                    if "rationale" in gemini_data:
+                        report["rationale"] = gemini_data["rationale"]
+                    if "factors" in gemini_data:
+                        report["dynamic_factors"] = gemini_data["factors"]
             except Exception as e:
                 print(f" [!] [GEMINI] Failed to generate dynamic summary: {e}")
 

@@ -17,4 +17,5 @@ tldextract
 numpy
 scipy
 python-dotenv
-google-generativeai
+google-genai
+virustotal-python

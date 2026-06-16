@@ -137,7 +137,7 @@ function ResultPage() {
     const faceConsistency = isDeepfake ? 34 : 92;
     const lightingAnalysis = isDeepfake ? 28 : 88;
 
-    const breakdownData = [
+    const breakdownData = data.dynamicFactors ? data.dynamicFactors : [
       { label: "Artifact Scan", value: artifactScore, description: "GAN artifacts & noise patterns" },
       { label: "Facial Consistency", value: faceConsistency, description: "Landmark alignment & symmetry" },
       { label: "Lighting Analysis", value: lightingAnalysis, description: "Shadow & illumination consistency" },
@@ -289,7 +289,7 @@ function ResultPage() {
     const burstiness = isAIGenerated ? 32 : 69;
     const repetitionScore = isAIGenerated ? 81 : 34;
 
-    const breakdownData = [
+    const breakdownData = data.dynamicFactors ? data.dynamicFactors : [
       { label: "Perplexity", value: perplexity, description: "Lower = more predictable (AI)" },
       { label: "Burstiness", value: burstiness, description: "Sentence length variation" },
       { label: "Repetition", value: repetitionScore, description: "N-gram repetition frequency" },
@@ -431,7 +431,7 @@ function ResultPage() {
     const domainRep = isPhishing ? 78 : 5;
     const structuralRisk = isPhishing ? 92 : 8;
 
-    const breakdownData = [
+    const breakdownData = data.dynamicFactors ? data.dynamicFactors : [
       { label: "URL Analysis", value: urlScore, description: "Character entropy & spoofing patterns" },
       { label: "Domain Rep", value: domainRep, description: "Blacklist status & age heuristics" },
       { label: "Heuristics", value: structuralRisk, description: "Tld-extraction & redirection risk" },

@@ -463,6 +463,7 @@ function DeepfakePanel({ onCheckLimit, onTrackScan, headers, onTriggerLimitModal
               (report.status === "Manipulated"
                 ? "Multiple manipulation traces detected across the multi-modal neural scan."
                 : "No significant deepfake patterns found. Media appears authentic."),
+            dynamicFactors: analysisResponse.data.dynamicFactors,
           },
           fileName: file.name,
           timestamp: new Date().toISOString(),

@@ -21,10 +21,87 @@ import pandas as pd
 import urllib.parse
 import tldextract
 import tempfile
+import virustotal_python
+from base64 import urlsafe_b64encode
+from urllib.parse import urlparse
 from collections import Counter
 from typing import Tuple, List, Optional, Dict, Any
 
+class PhishingDetectorVT:
+    def __init__(self, api_key: str):
+        self.api_key = api_key
+
+    def _is_valid_url(self, url: str) -> bool:
+        try:
+            result = urlparse(url if "://" in url else f"http://{url}")
+            return bool(result.netloc)
+        except ValueError:
+            return False
+
+    def _encode_url(self, url: str) -> str:
+        return urlsafe_b64encode(url.encode()).decode().strip("=")
+
+    def predict(self, url: str, max_wait: int = 40, poll_interval: int = 5) -> Dict[str, Any]:
+        if not self._is_valid_url(url):
+            return {"error": "Invalid URL", "status": "Error"}
+
+        url_id = self._encode_url(url)
+
+        try:
+            with virustotal_python.Virustotal(self.api_key) as vtotal:
+                # Step 1: Submit URL for scanning
+                vtotal.request("urls", data={"url": url}, method="POST")
+
+                # Step 2: Poll until analysis completes or timeout
+                elapsed = 0
+                while elapsed < max_wait:
+                    report = vtotal.request(f"urls/{url_id}")
+                    attributes = report.data.get("attributes", {})
+                    status = attributes.get("status", "completed")
+
+                    if status != "queued":
+                        break
+
+                    print(f" [*] [VT_ENGINE] Analysis queued for {url[:30]}... waiting {poll_interval}s")
+                    time.sleep(poll_interval)
+                    elapsed += poll_interval
+
+                # Step 3: Extract stats
+                stats = attributes.get("last_analysis_stats", {})
+
+                malicious_count = stats.get("malicious", 0)
+                suspicious_count = stats.get("suspicious", 0)
+                harmless_count = stats.get("harmless", 0)
+
+                # Calculate confidence and status
+                is_fake = malicious_count > 0 or suspicious_count > 2
+
+                # Confidence score based on engine consensus
+                total_engines = sum(stats.values()) if stats else 1
+                if is_fake:
+                    confidence = int(((malicious_count + suspicious_count) / total_engines) * 100)
+                    confidence = max(65, confidence) # Floor for malicious
+                else:
+                    confidence = int((harmless_count / total_engines) * 100)
+                    confidence = min(99, confidence)
+
+                return {
+                    "is_synthetic": is_fake,
+                    "status": "Manipulated" if is_fake else "Authentic",
+                    "confidence_score": confidence,
+                    "malicious": malicious_count,
+                    "suspicious": suspicious_count,
+                    "harmless": harmless_count,
+                    "permalink": f"https://www.virustotal.com/gui/url/{url_id}",
+                    "rationale": f"VirusTotal Cross-Check: {malicious_count} engines flagged as malicious." if is_fake else "VirusTotal analysis shows no security flags from major antivirus vendors."
+                }
+
+        except Exception as e:
+            print(f" [!] [VT_ENGINE] API Error: {e}")
+            return {"error": str(e), "status": "Error"}
+
 class DeepfakeAudioDetector:
+
     TARGET_SAMPLE_RATE = 16000
     MAX_LENGTH_SECONDS = 4.0
 
@@ -73,7 +150,7 @@ class DeepfakeAudioDetector:
             predicted_class = logits.argmax(dim=-1).item()
             confidence = probs[0, predicted_class].item()
         status = "Authentic" if predicted_class == 0 else "Manipulated"
-        confidence_score = int(confidence * 100)
+        confidence_score = int(probs[0, 1].item() * 100) # Always return probability of class 1 (Manipulated)
         print(f"[+] [AUDIO_MODEL] Result: {status} ({confidence_score}%)")
         return status, confidence_score
 
@@ -124,46 +201,81 @@ class DeepfakeVisionDetector:
                 all_probs.append(prob)
         final_prob = max(all_probs) if all_probs else 0
         label = "Fake" if final_prob > 0.85 else "Real"
-        confidence_score = int(final_prob * 100) if label == "Fake" else int((1 - final_prob) * 100)
+        confidence_score = int(final_prob * 100) # Always return probability of being Fake
         print(f"[+] [VISION_MODEL] Result: {label} ({confidence_score}%)")
         return label, confidence_score
 
-    def predict_video(self, video_path: str, frame_skip: int = 40) -> Tuple[str, int]:
-        print(f"[*] [VISION_MODEL] Analyzing video locally...")
+    def predict_video(self, video_path: str, max_samples: int = 8) -> Tuple[str, int]:
+        print(f"[*] [VISION_MODEL] Analyzing video locally (Optimized Pipeline)...")
         cap = cv2.VideoCapture(video_path)
         if not cap.isOpened(): return "Error", 0
+        
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        if total_frames <= 0: return "Error", 0
+
+        # Calculate evenly spaced indices (sampling from start, middle, and end)
+        # We start at 10% and end at 90% to avoid potentially black/static header/outro frames
+        start_frame = int(total_frames * 0.1)
+        end_frame = int(total_frames * 0.9)
+        if end_frame <= start_frame:
+            indices = [total_frames // 2]
+        else:
+            indices = [int(start_frame + i * (end_frame - start_frame) / (max_samples - 1)) for i in range(max_samples)]
+
         all_probs = []
-        frame_count = 0
-        while len(all_probs) < 15:
+        
+        for i, idx in enumerate(indices):
+            cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
             ret, frame = cap.read()
-            if not ret: break
-            if frame_count % frame_skip != 0:
-                frame_count += 1
-                continue
-            frame_denoised = cv2.bilateralFilter(frame, 9, 75, 75)
-            results = self.face_detector(frame_denoised)
-            if len(results) > 0 and len(results[0].boxes) > 0:
-                box = results[0].boxes.xyxy[0]
-                x1, y1, x2, y2 = box.cpu().numpy().astype(int)
-                face = frame_denoised[max(0, y1):y2, max(0, x1):x2]
-                if face.size == 0: continue
-                face_pil = Image.fromarray(cv2.cvtColor(face, cv2.COLOR_BGR2RGB))
-                input_tensor = self.augmentation(face_pil).unsqueeze(0).to(self.device)
-                with torch.no_grad():
-                    logits = self.classifier(input_tensor).view(-1)
-                    all_probs.append(torch.sigmoid(logits).item())
+            if not ret: continue
+
+            # Optimization 1: Downscale for face detection (makes YOLO much faster)
+            h, w = frame.shape[:2]
+            if w > 640:
+                scale = 640 / w
+                frame_small = cv2.resize(frame, (640, int(h * scale)))
             else:
-                frame_pil = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-                input_tensor = self.augmentation(frame_pil).unsqueeze(0).to(self.device)
+                frame_small = frame
+
+            results = self.face_detector(frame_small, verbose=False)
+            
+            if len(results) > 0 and len(results[0].boxes) > 0:
+                # We analyze the highest-confidence face in the frame
+                box = results[0].boxes.xyxy[0].cpu().numpy()
+                
+                # Map coordinates back if we downscaled
+                if w > 640:
+                    box = box / (640 / w)
+                
+                x1, y1, x2, y2 = box.astype(int)
+                face = frame[max(0, y1):min(h, y2), max(0, x1):min(w, x2)]
+                
+                if face.size == 0: continue
+
+                # Optimization 2: Targeted Denoising (only on the crop)
+                face_denoised = cv2.bilateralFilter(face, 5, 60, 60)
+                
+                face_pil = Image.fromarray(cv2.cvtColor(face_denoised, cv2.COLOR_BGR2RGB))
+                input_tensor = self.augmentation(face_pil).unsqueeze(0).to(self.device)
+                
                 with torch.no_grad():
                     logits = self.classifier(input_tensor).view(-1)
                     all_probs.append(torch.sigmoid(logits).item())
-            frame_count += 1
+            
+            print(f"    [PROGRESS] Processed frame {i+1}/{max_samples} (index {idx})")
+
         cap.release()
-        if not all_probs: return "Error", 0
-        final_prob = sum(all_probs) / len(all_probs)
+        
+        if not all_probs: 
+            print(" [!] [VISION_MODEL] No faces found in any sample frames.")
+            return "Error", 0
+
+        avg_prob = sum(all_probs) / len(all_probs)
+        final_prob = avg_prob
+        
         label = "Fake" if final_prob > 0.85 else "Real"
-        confidence_score = int(final_prob * 100) if label == "Fake" else int((1 - final_prob) * 100)
+        confidence_score = int(final_prob * 100) # Always return probability of being Fake
+        
         print(f"[+] [VISION_MODEL] Video Result: {label} ({confidence_score}%)")
         return label, confidence_score
 
@@ -179,7 +291,7 @@ class DeepfakeTextDetector:
         label = self.classifier.predict(text_vectorized)[0]
         prob = self.classifier.predict_proba(text_vectorized)[0]
         status = "AI-Generated" if label == 1 else "Human-Written"
-        confidence_score = int(prob[1] * 100) if label == 1 else int(prob[0] * 100)
+        confidence_score = int(prob[1] * 100) # Always return probability of AI-Generated (class 1)
         print(f"[+] [TEXT_MODEL] Result: {status} ({confidence_score}%)")
         return status, confidence_score
 
@@ -204,7 +316,7 @@ class SightengineDetector:
                 deepfake_score = max([f.get('deepfake', 0.0) for f in data['faces']])
             final_score = max(genai_score, deepfake_score)
             label = "Synthetic" if final_score > 0.5 else "Authentic"
-            conf = final_score * 100 if label == "Synthetic" else (1 - final_score) * 100
+            conf = final_score * 100 # Always return probability of being Fake
             print(f"[+] [SIGHTENGINE] Result: {label} ({conf:.1f}%)")
             return label, conf
         except Exception as e:
@@ -247,8 +359,8 @@ class SightengineDetector:
             label, conf = self.predict_image(tmp_path)
             
             if label != "Error":
-                # Normalize to 'Synthetic' probability for averaging
-                prob = (conf / 100) if label == "Synthetic" else (1 - (conf / 100))
+                # conf is already probability of being fake
+                prob = conf / 100
                 frame_results.append(prob)
             
             if os.path.exists(tmp_path):
@@ -267,7 +379,7 @@ class SightengineDetector:
         # We'll use a conservative 'max' approach: if one part of the video is fake, the video is fake
         final_score = max_prob
         label = "Synthetic" if final_score > 0.5 else "Authentic"
-        confidence = final_score * 100 if label == "Synthetic" else (1 - final_score) * 100
+        confidence = final_score * 100 # Always return probability of being Fake
 
         duration = round(time.time() - start_time, 2)
         print(f"[+] [SIGHTENGINE] Video Hack Result: {label} ({confidence:.1f}%) | Duration: {duration}s")
@@ -287,15 +399,9 @@ class SightengineDetector:
             
             prob = data.get('ai-speech', {}).get('prob', 0.0)
             label = "Synthetic" if prob > 0.5 else "Authentic"
-            conf = prob * 100 if label == "Synthetic" else (1 - prob) * 100
+            conf = prob * 100 # Always return probability of being Fake
             print(f"[+] [SIGHTENGINE] Result: {label} ({conf:.1f}%)")
             return label, conf
-        except requests.exceptions.Timeout:
-            print(f"[!] [SIGHTENGINE] Timeout Error: Audio upload took too long.")
-            return "Error", 0.0
-        except Exception as e:
-            print(f"[!] [SIGHTENGINE] Error: {e}")
-            return "Error", 0.0
 
 class PhishingDetector:
     def __init__(self, model_path: str, scaler_path: str, whitelist_path: str) -> None:
@@ -308,6 +414,6 @@ class PhishingDetector:
     def predict(self, url: str) -> Tuple[str, int]:
         url = url.strip().lower()
         ext = tldextract.extract(url)
-        if f"{ext.domain}.{ext.suffix}" in self.whitelisted_domains: return "Authentic", 99
+        if f"{ext.domain}.{ext.suffix}" in self.whitelisted_domains: return "Authentic", 0
         # Simplified for brevity
-        return "Authentic", 95
+        return "Authentic", 5
